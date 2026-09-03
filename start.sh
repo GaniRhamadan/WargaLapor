@@ -18,8 +18,8 @@ cd "$DIR/backend" || exit 1
 $PHP_BIN artisan migrate --seed --force
 
 echo ""
-echo "[2/3] Menjalankan Server Backend API di http://127.0.0.1:9000..."
-$PHP_BIN artisan serve --host=127.0.0.1 --port=9000 &
+echo "[2/3] Menjalankan Server Backend API di http://127.0.0.1:8000..."
+$PHP_BIN artisan serve --host=127.0.0.1 --port=8000 &
 BACKEND_PID=$!
 
 echo ""
