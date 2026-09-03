@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+php -c /home/gani/benefit/backend/php.ini /home/gani/benefit/backend/artisan "$@"
