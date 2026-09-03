@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountVerified;
+use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\SanitizeInputMiddleware;
 use App\Http\Middleware\SecurityHeadersMiddleware;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'verified.account' => EnsureAccountVerified::class,
+            'role' => EnsureRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -65,14 +65,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 
     // Officer Task Operations
-    Route::prefix('officer')->group(function () {
+    Route::prefix('officer')->middleware('role:officer,admin')->group(function () {
         Route::get('/tasks', [OfficerTaskController::class, 'index']);
         Route::get('/tasks/{id}', [OfficerTaskController::class, 'show']);
         Route::post('/tasks/{id}/status', [OfficerTaskController::class, 'updateStatus']);
     });
 
     // Admin Operations
-    Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->middleware('role:admin')->group(function () {
         // Reports Management & Verification
         Route::get('/reports', [AdminReportController::class, 'index']);
         Route::post('/reports/{id}/verify', [AdminReportController::class, 'verify']);

@@ -132,12 +132,14 @@ class OfficerTaskController extends Controller
             'progress_images' => 'nullable|array',
             'progress_images.*' => 'nullable|string',
             'resolution_proof_image' => 'nullable|string',
+            'proof_image' => 'nullable|string',
         ]);
 
         $newStatus = strtoupper($validated['status']);
         $oldStatus = $report->status;
+        $resolutionProof = $validated['resolution_proof_image'] ?? $validated['proof_image'] ?? null;
 
-        return DB::transaction(function () use ($report, $user, $validated, $newStatus, $oldStatus) {
+        return DB::transaction(function () use ($report, $user, $validated, $newStatus, $oldStatus, $resolutionProof) {
             $report->status = $newStatus;
             if ($newStatus === 'RESOLVED') {
                 $report->resolved_at = now();
@@ -159,8 +161,8 @@ class OfficerTaskController extends Controller
                 }
             }
 
-            if ($newStatus === 'RESOLVED' && !empty($validated['resolution_proof_image'])) {
-                $proofPath = $this->storageService->storeImage($validated['resolution_proof_image'], 'reports/resolution');
+            if ($newStatus === 'RESOLVED' && !empty($resolutionProof)) {
+                $proofPath = $this->storageService->storeImage($resolutionProof, 'reports/resolution');
                 ReportImage::create([
                     'report_id' => $report->id,
                     'image_path' => $proofPath,

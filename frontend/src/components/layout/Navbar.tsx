@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import {
@@ -25,6 +25,8 @@ export const Navbar: React.FC = () => {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const isHome = location.pathname === '/';
 
   const handleLogout = async () => {
     await logout();
@@ -37,8 +39,26 @@ export const Navbar: React.FC = () => {
     return '/citizen';
   };
 
+  const getNavLinkClass = (path: string) => {
+    const isActive = location.pathname === path;
+    if (isHome) {
+      return `text-sm font-semibold transition-colors ${
+        isActive ? 'text-teal-400' : 'text-slate-300 hover:text-teal-400'
+      }`;
+    }
+    return `text-sm font-semibold transition-colors ${
+      isActive ? 'text-teal-600' : 'text-slate-600 hover:text-teal-600'
+    }`;
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full glass-header border-b border-slate-200/80">
+    <header
+      className={`sticky top-0 z-40 w-full transition-colors duration-200 ${
+        isHome
+          ? 'bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 shadow-xs'
+          : 'glass-header border-b border-slate-200/80'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18">
           {/* Brand Logo */}
@@ -47,11 +67,19 @@ export const Navbar: React.FC = () => {
               <Shield className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xl font-black tracking-tight text-slate-900 flex items-center gap-1">
-                Warga<span className="text-teal-600">Lapor</span>
-                <span className="inline-block w-2 h-2 rounded-full bg-teal-500 ml-0.5"></span>
+              <span
+                className={`text-xl font-black tracking-tight flex items-center gap-1 ${
+                  isHome ? 'text-white' : 'text-slate-900'
+                }`}
+              >
+                Warga<span className="text-teal-400">Lapor</span>
+                <span className="inline-block w-2 h-2 rounded-full bg-teal-400 ml-0.5"></span>
               </span>
-              <p className="text-[10px] font-semibold text-slate-400 -mt-1 hidden sm:block tracking-wider uppercase">
+              <p
+                className={`text-[10px] font-semibold -mt-1 hidden sm:block tracking-wider uppercase ${
+                  isHome ? 'text-slate-400' : 'text-slate-400'
+                }`}
+              >
                 Smart Citizen Reporting
               </p>
             </div>
@@ -59,35 +87,23 @@ export const Navbar: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-7">
-            <Link
-              to="/"
-              className="text-sm font-medium text-slate-600 hover:text-teal-600 transition-colors"
-            >
+            <Link to="/" className={getNavLinkClass('/')}>
               Beranda
             </Link>
             <Link
               to="/public/map"
-              className="text-sm font-medium text-slate-600 hover:text-teal-600 transition-colors flex items-center gap-1.5"
+              className={`${getNavLinkClass('/public/map')} flex items-center gap-1.5`}
             >
-              <Compass className="w-4 h-4 text-teal-600" />
+              <Compass className={`w-4 h-4 ${isHome ? 'text-teal-400' : 'text-teal-600'}`} />
               Peta Publik
             </Link>
-            <Link
-              to="/public/how-it-works"
-              className="text-sm font-medium text-slate-600 hover:text-teal-600 transition-colors"
-            >
+            <Link to="/public/how-it-works" className={getNavLinkClass('/public/how-it-works')}>
               Cara Kerja
             </Link>
-            <Link
-              to="/public/stats"
-              className="text-sm font-medium text-slate-600 hover:text-teal-600 transition-colors"
-            >
+            <Link to="/public/stats" className={getNavLinkClass('/public/stats')}>
               Statistik Kota
             </Link>
-            <Link
-              to="/public/about"
-              className="text-sm font-medium text-slate-600 hover:text-teal-600 transition-colors"
-            >
+            <Link to="/public/about" className={getNavLinkClass('/public/about')}>
               Tentang Kami
             </Link>
           </nav>
@@ -217,12 +233,24 @@ export const Navbar: React.FC = () => {
             ) : (
               <div className="flex items-center gap-2.5">
                 <Link to="/login">
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={
+                      isHome
+                        ? 'text-slate-200 hover:text-white hover:bg-slate-800/70 font-semibold cursor-pointer'
+                        : 'font-semibold cursor-pointer'
+                    }
+                  >
                     Masuk
                   </Button>
                 </Link>
                 <Link to="/register">
-                  <Button variant="primary" size="sm">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="shadow-md shadow-teal-500/25 font-semibold cursor-pointer"
+                  >
                     Daftar Warga
                   </Button>
                 </Link>
@@ -232,7 +260,9 @@ export const Navbar: React.FC = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl md:hidden text-slate-600 hover:bg-slate-100 transition-colors"
+              className={`p-2 rounded-xl md:hidden transition-colors cursor-pointer ${
+                isHome ? 'text-slate-200 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'
+              }`}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -242,39 +272,53 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200/80 bg-white px-4 pt-3 pb-6 space-y-3">
+        <div
+          className={`md:hidden border-t px-4 pt-3 pb-6 space-y-3 ${
+            isHome ? 'bg-slate-950/95 backdrop-blur-xl border-slate-800' : 'bg-white border-slate-200/80'
+          }`}
+        >
           <Link
             to="/"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-sm font-medium text-slate-700 hover:text-teal-600"
+            className={`block py-2 text-sm font-medium ${
+              isHome ? 'text-teal-400 font-semibold' : 'text-slate-700 hover:text-teal-600'
+            }`}
           >
             Beranda
           </Link>
           <Link
             to="/public/map"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-sm font-medium text-slate-700 hover:text-teal-600"
+            className={`block py-2 text-sm font-medium ${
+              isHome ? 'text-slate-200 hover:text-teal-400' : 'text-slate-700 hover:text-teal-600'
+            }`}
           >
             Peta Laporan Publik
           </Link>
           <Link
             to="/public/how-it-works"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-sm font-medium text-slate-700 hover:text-teal-600"
+            className={`block py-2 text-sm font-medium ${
+              isHome ? 'text-slate-200 hover:text-teal-400' : 'text-slate-700 hover:text-teal-600'
+            }`}
           >
             Cara Kerja
           </Link>
           <Link
             to="/public/stats"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-sm font-medium text-slate-700 hover:text-teal-600"
+            className={`block py-2 text-sm font-medium ${
+              isHome ? 'text-slate-200 hover:text-teal-400' : 'text-slate-700 hover:text-teal-600'
+            }`}
           >
             Statistik Kota
           </Link>
           <Link
             to="/public/about"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-sm font-medium text-slate-700 hover:text-teal-600"
+            className={`block py-2 text-sm font-medium ${
+              isHome ? 'text-slate-200 hover:text-teal-400' : 'text-slate-700 hover:text-teal-600'
+            }`}
           >
             Tentang Kami
           </Link>

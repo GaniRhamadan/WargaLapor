@@ -41,7 +41,8 @@ export interface RegisterOtpResponse {
 }
 
 export interface SecurityChallenge {
-  question: string;
+  question?: string;
+  captcha_image?: string;
   token: string;
   expires_in_seconds: number;
 }

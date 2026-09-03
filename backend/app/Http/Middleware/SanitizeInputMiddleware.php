@@ -16,8 +16,16 @@ class SanitizeInputMiddleware
         $input = $request->all();
         array_walk_recursive($input, function (&$value, $key) {
             if (is_string($value)) {
-                // Do not sanitize password fields to avoid altering valid characters
-                if (str_contains($key, 'password') || str_contains($key, 'token') || str_contains($key, 'otp')) {
+                // Do not sanitize password fields, tokens, OTPs, or image binaries/base64 strings
+                if (
+                    str_contains($key, 'password') ||
+                    str_contains($key, 'token') ||
+                    str_contains($key, 'otp') ||
+                    str_contains($key, 'image') ||
+                    str_contains($key, 'avatar') ||
+                    str_contains($key, 'proof') ||
+                    str_starts_with($value, 'data:image')
+                ) {
                     return;
                 }
 

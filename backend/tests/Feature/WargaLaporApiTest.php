@@ -98,7 +98,19 @@ class WargaLaporApiTest extends TestCase
     {
         $officerUser = User::where('email', 'petugas@wargalapor.test')->first();
         $officer = Officer::where('user_id', $officerUser->id)->first();
-        $report = Report::where('status', 'ASSIGNED')->first() ?: Report::first();
+        $report = Report::whereHas('assignments', function ($q) use ($officer) {
+            $q->where('officer_id', $officer->id)->whereIn('status', ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS']);
+        })->first();
+
+        if (!$report) {
+            $report = Report::first();
+            $report->assignments()->create([
+                'officer_id' => $officer->id,
+                'assigned_by' => 1,
+                'status' => 'ASSIGNED',
+                'assigned_at' => now(),
+            ]);
+        }
 
         // Officer updates to IN_PROGRESS
         $res = $this->actingAs($officerUser, 'sanctum')->postJson("/api/officer/tasks/{$report->id}/status", [
@@ -119,5 +131,44 @@ class WargaLaporApiTest extends TestCase
             'id' => $report->id,
             'status' => 'RESOLVED',
         ]);
+    }
+
+    public function test_role_authorization_guards_prevent_unauthorized_access(): void
+    {
+        $citizen = User::where('email', 'warga@wargalapor.test')->first();
+        $officer = User::where('email', 'petugas@wargalapor.test')->first();
+
+        // 1. Citizen cannot access admin reports or officer tasks
+        $this->actingAs($citizen, 'sanctum')->getJson('/api/admin/reports')->assertStatus(403);
+        $this->actingAs($citizen, 'sanctum')->getJson('/api/admin/citizens')->assertStatus(403);
+        $this->actingAs($citizen, 'sanctum')->getJson('/api/admin/analytics')->assertStatus(403);
+        $this->actingAs($citizen, 'sanctum')->getJson('/api/officer/tasks')->assertStatus(403);
+
+        // 2. Officer cannot access admin management
+        $this->actingAs($officer, 'sanctum')->getJson('/api/admin/reports')->assertStatus(403);
+        $this->actingAs($officer, 'sanctum')->getJson('/api/admin/citizens')->assertStatus(403);
+    }
+
+    public function test_visual_captcha_challenge_generation_and_validation(): void
+    {
+        // 1. Fetch challenge
+        $response = $this->getJson('/api/auth/security-challenge');
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'captcha_image',
+                'token',
+                'expires_in_seconds',
+            ]);
+
+        $this->assertStringStartsWith('data:image/svg+xml;base64,', $response->json('captcha_image'));
+
+        // 2. Test failed login with invalid captcha answer
+        $badCaptchaLogin = $this->postJson('/api/auth/login', [
+            'email' => 'warga@wargalapor.test',
+            'password' => 'password',
+            'security_token' => $response->json('token'),
+            'security_answer' => 'ZZZZZ', // wrong code
+        ]);
+        $badCaptchaLogin->assertStatus(422);
     }
 }

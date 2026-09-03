@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, RefreshCw, CheckCircle2, Lock } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { SecurityChallenge } from '../../types/auth';
 
@@ -39,37 +39,45 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
   }, []);
 
   const handleAnswerChange = (val: string) => {
-    setAnswer(val);
-    const valid = val.trim().length > 0 && challenge !== null;
+    // Only allow alphanumeric characters, uppercase, max 5 chars
+    const cleaned = val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+    setAnswer(cleaned);
+    const valid = cleaned.length >= 4 && challenge !== null;
     setIsAnswered(valid);
     if (challenge) {
       onChallengeChange({
         token: challenge.token,
-        answer: val.trim(),
+        answer: cleaned,
         isValid: valid,
       });
     }
   };
 
   return (
-    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5 transition-all">
+    <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-3 transition-all shadow-xs">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center">
-            <ShieldCheck className="w-3.5 h-3.5" />
+          <div className="w-7 h-7 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-xs">
+            <ShieldCheck className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-slate-800">
-            Verifikasi Anti-Spam Bot
-          </span>
+          <div>
+            <span className="text-xs font-bold text-slate-800 block leading-tight">
+              Verifikasi Keamanan CAPTCHA
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium">
+              Proteksi Anti-Bot & Scraper
+            </span>
+          </div>
         </div>
+
         <button
           type="button"
           onClick={fetchChallenge}
           disabled={loading}
-          className="text-[11px] text-teal-600 hover:text-teal-700 font-semibold flex items-center gap-1 transition-colors"
-          title="Ganti Soal Verifikasi"
+          className="text-xs text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100/80 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-colors border border-teal-200/60 cursor-pointer disabled:opacity-50"
+          title="Ganti Gambar CAPTCHA"
         >
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>Ganti</span>
         </button>
       </div>
@@ -93,35 +101,60 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
         />
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="flex-1 px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 select-none shadow-inner flex items-center justify-between">
+      {/* Visual CAPTCHA Image & User Input Box */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+        {/* Visual Distorted Image Container */}
+        <div
+          onClick={fetchChallenge}
+          title="Klik gambar untuk memuat ulang CAPTCHA"
+          className="sm:col-span-7 h-14 rounded-xl overflow-hidden bg-[#141826] border border-slate-800 flex items-center justify-center cursor-pointer select-none shadow-inner relative group"
+        >
           {loading ? (
-            <span className="text-slate-400 animate-pulse">Memuat tantangan keamanan...</span>
-          ) : challenge ? (
-            <span>{challenge.question}</span>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <RefreshCw className="w-4 h-4 animate-spin text-teal-400" />
+              <span>Membuat CAPTCHA...</span>
+            </div>
+          ) : challenge?.captcha_image ? (
+            <>
+              <img
+                src={challenge.captcha_image}
+                alt="Kode Verifikasi CAPTCHA"
+                className="w-full h-full object-cover pointer-events-none"
+              />
+              <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white/90 font-medium backdrop-blur-[1px]">
+                Klik untuk ganti
+              </div>
+            </>
           ) : (
-            <span className="text-rose-500 text-[11px]">Gagal memuat tantangan</span>
+            <span className="text-rose-400 text-xs font-semibold">Gagal memuat CAPTCHA</span>
           )}
         </div>
 
-        <div className="relative w-28 shrink-0">
+        {/* Input Box for 5-digit CAPTCHA */}
+        <div className="sm:col-span-5 relative">
           <input
-            type="number"
+            type="text"
             required
-            placeholder="Jawaban"
+            maxLength={5}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            placeholder="KODE..."
             value={answer}
             onChange={(e) => handleAnswerChange(e.target.value)}
-            className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white font-bold text-center"
+            className="w-full h-14 text-base px-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white font-mono font-black tracking-widest text-center uppercase text-slate-800 placeholder:text-slate-400 placeholder:font-sans placeholder:tracking-normal placeholder:font-medium placeholder:text-xs"
           />
           {isAnswered && (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 absolute right-2 top-2.5 pointer-events-none" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 absolute right-3 top-5 pointer-events-none" />
           )}
         </div>
       </div>
-      <p className="text-[10px] text-slate-500 flex items-center gap-1">
-        <ShieldAlert className="w-3 h-3 text-slate-400 shrink-0" />
-        <span>Sistem keamanan mendeteksi & memblokir bot spam secara otomatis.</span>
-      </p>
+
+      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-0.5">
+        <Lock className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+        <span>Ketik 5 karakter di atas untuk verifikasi keamanan non-bot.</span>
+      </div>
     </div>
   );
 };

@@ -20,10 +20,17 @@ class DuplicateDetectionService
         ?int $excludeReportId = null,
         float $radiusMeters = 600.0
     ): array {
-        // Query active or recent reports
+        // Spatial bounding-box pre-filter to leverage (latitude, longitude) composite database index
+        $buffer = $radiusMeters * 1.5;
+        $latDelta = $buffer / 111000.0;
+        $lngDelta = $buffer / (111000.0 * max(0.1, cos(deg2rad($latitude))));
+
+        // Query active or recent reports within bounding box
         $query = Report::with(['category', 'images'])
             ->whereNotIn('status', ['REJECTED', 'CLOSED'])
-            ->where('created_at', '>=', now()->subDays(45));
+            ->where('created_at', '>=', now()->subDays(45))
+            ->whereBetween('latitude', [$latitude - $latDelta, $latitude + $latDelta])
+            ->whereBetween('longitude', [$longitude - $lngDelta, $longitude + $lngDelta]);
 
         if ($excludeReportId) {
             $query->where('id', '!=', $excludeReportId);

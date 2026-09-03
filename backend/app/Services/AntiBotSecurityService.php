@@ -54,27 +54,26 @@ class AntiBotSecurityService
     }
 
     /**
-     * Generate a lightweight mathematical/symbolic anti-bot challenge.
+     * Character set excluding ambiguous characters (0, O, 1, I, l), matching ai_agar_tidak_ada_cliper_jahat.
+     */
+    protected const CHAR_SET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+    /**
+     * Generate a visual image CAPTCHA challenge (distorted image with signed HMAC token).
      */
     public function generateChallenge(): array
     {
-        $num1 = random_int(3, 19);
-        $num2 = random_int(2, 9);
-        $operations = ['+', '*'];
-        $op = $operations[array_rand($operations)];
+        $length = 5;
+        $code = '';
+        $charSetLen = strlen(self::CHAR_SET);
+        for ($i = 0; $i < $length; $i++) {
+            $code .= self::CHAR_SET[random_int(0, $charSetLen - 1)];
+        }
 
-        $answer = match ($op) {
-            '+' => $num1 + $num2,
-            '*' => $num1 * $num2,
-        };
-
-        $questionText = match ($op) {
-            '+' => "Berapa hasil dari {$num1} + {$num2}?",
-            '*' => "Berapa hasil dari {$num1} × {$num2}?",
-        };
+        $image = $this->renderCaptchaSvg($code);
 
         $payload = json_encode([
-            'ans' => $answer,
+            'ans' => $code,
             'ts' => time(),
             'nonce' => Str::random(16),
         ]);
@@ -82,14 +81,63 @@ class AntiBotSecurityService
         $token = Crypt::encryptString($payload);
 
         return [
-            'question' => $questionText,
+            'captcha_image' => $image,
             'token' => $token,
-            'expires_in_seconds' => 900, // 15 mins
+            'expires_in_seconds' => 300, // 5 mins
         ];
     }
 
     /**
-     * Verify the anti-bot challenge answer.
+     * Render SVG-based distorted CAPTCHA with noise, disturbance curves, and rotated characters.
+     */
+    protected function renderCaptchaSvg(string $code): string
+    {
+        $width = 180;
+        $height = 54;
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'.$width.'" height="'.$height.'" viewBox="0 0 '.$width.' '.$height.'">';
+        $svg .= '<rect width="100%" height="100%" fill="#141826" rx="8"/>';
+
+        // Background noise dots
+        for ($i = 0; $i < 65; $i++) {
+            $cx = random_int(2, $width - 2);
+            $cy = random_int(2, $height - 2);
+            $rCol = random_int(70, 200);
+            $gCol = random_int(70, 200);
+            $bCol = random_int(180, 255);
+            $svg .= '<circle cx="'.$cx.'" cy="'.$cy.'" r="1" fill="rgb('.$rCol.','.$gCol.','.$bCol.')" opacity="0.6"/>';
+        }
+
+        // Disturbance curved lines
+        for ($i = 0; $i < 4; $i++) {
+            $x1 = random_int(5, $width - 5);
+            $y1 = random_int(5, $height - 5);
+            $x2 = random_int(5, $width - 5);
+            $y2 = random_int(5, $height - 5);
+            $qx = random_int(20, $width - 20);
+            $qy = random_int(5, $height - 5);
+            $lineColor = 'rgba('.random_int(100, 255).','.random_int(150, 255).','.random_int(200, 255).',0.5)';
+            $svg .= '<path d="M'.$x1.','.$y1.' Q'.$qx.','.$qy.' '.$x2.','.$y2.'" stroke="'.$lineColor.'" stroke-width="1.6" fill="none"/>';
+        }
+
+        // Distorted characters with rotation
+        $fontColors = ['#38BDF8', '#34D399', '#FBBF24', '#F472B6', '#A78BFA', '#2DD4BF', '#60A5FA'];
+        $len = strlen($code);
+        $charStep = ($width - 32) / $len;
+        for ($i = 0; $i < $len; $i++) {
+            $char = $code[$i];
+            $x = 18 + ($i * $charStep) + random_int(-2, 2);
+            $y = 38 + random_int(-3, 3);
+            $rot = random_int(-22, 22);
+            $col = $fontColors[array_rand($fontColors)];
+            $svg .= '<text x="'.$x.'" y="'.$y.'" font-family="Courier, Consolas, monospace" font-weight="900" font-size="28" fill="'.$col.'" transform="rotate('.$rot.', '.$x.', '.$y.')">'.$char.'</text>';
+        }
+
+        $svg .= '</svg>';
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
+
+    /**
+     * Verify the anti-bot challenge answer (case-insensitive).
      */
     public function verifySecurityChallenge(string $token, mixed $answer): void
     {
@@ -101,18 +149,21 @@ class AntiBotSecurityService
                 throw new Exception('Token keamanan anti-bot tidak valid.');
             }
 
-            // Expiry check (15 minutes)
-            if (time() - $data['ts'] > 900) {
-                throw new Exception('Tantangan keamanan telah kedaluwarsa. Silakan muat ulang halaman.');
+            // Expiry check (5 minutes)
+            if (time() - $data['ts'] > 300) {
+                throw new Exception('Kode CAPTCHA telah kedaluwarsa. Silakan muat ulang kode baru.');
             }
 
-            // Verify minimum human reaction time (e.g. at least 0.5s)
+            // Verify minimum human reaction time
             if (time() - $data['ts'] < 0) {
                 throw new Exception('Anomali waktu terdeteksi.');
             }
 
-            if ((int) $answer !== (int) $data['ans']) {
-                throw new Exception('Jawaban verifikasi anti-bot salah. Silakan coba lagi.');
+            $expected = strtoupper(trim((string) $data['ans']));
+            $submitted = strtoupper(trim((string) $answer));
+
+            if ($submitted !== $expected) {
+                throw new Exception('Kode CAPTCHA salah atau tidak sesuai gambar. Silakan coba lagi.');
             }
         } catch (Exception $e) {
             throw new Exception($e->getMessage() ?: 'Verifikasi anti-bot gagal.');

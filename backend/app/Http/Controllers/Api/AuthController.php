@@ -53,7 +53,7 @@ class AuthController extends Controller
         // 2. Strict Input Validation (Active email & Valid Phone required)
         $validated = $request->validate([
             'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[a-zA-Z\s\.\,\'\-]+$/'],
-            'email' => ['required', 'string', 'email:rfc,dns,filter', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'string', 'email:rfc,filter', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
             'nik' => ['nullable', 'string', 'regex:/^[0-9]{16}$/'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
@@ -389,7 +389,8 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Kode OTP reset kata sandi telah dikirimkan ke email Anda.',
             'identifier' => $user->email,
-            'demo_otp' => $otpResult['demo_otp'],
+            'channel' => $otpResult['channel'],
+            'expires_at' => $otpResult['expires_at'],
         ]);
     }
 

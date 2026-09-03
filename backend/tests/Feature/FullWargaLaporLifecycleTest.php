@@ -42,6 +42,17 @@ class FullWargaLaporLifecycleTest extends TestCase
 
         $this->assertEquals(201, $registerResponse->status(), 'STEP 2: ' . json_encode($registerResponse->json()));
         $citizenUser = User::where('email', $uniqueEmail)->first();
+
+        // 2b. CITIZEN: Verify OTP
+        $otp = \App\Models\OtpVerification::where('identifier', $uniqueEmail)->latest()->first();
+        $this->assertNotNull($otp);
+        $verifyResponse = $this->postJson('/api/auth/verify-otp', [
+            'identifier' => $uniqueEmail,
+            'otp_code' => $otp->otp_code,
+        ]);
+        $this->assertEquals(200, $verifyResponse->status(), 'STEP 2b: ' . json_encode($verifyResponse->json()));
+
+        $citizenUser->refresh();
         Sanctum::actingAs($citizenUser);
 
         // 3. CITIZEN: Trigger AI Analysis Preview

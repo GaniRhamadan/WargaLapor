@@ -26,8 +26,8 @@ class StorageService
         if ($file instanceof UploadedFile) {
             $ext = strtolower($file->getClientOriginalExtension());
             $filename = Str::uuid() . '.' . $ext;
-            $path = $file->storeAs("public/{$folder}", $filename);
-            return Storage::url($path);
+            $path = $file->storeAs($folder, $filename, 'public');
+            return Storage::disk('public')->url($path);
         }
 
         // Handle base64 image strings if passed
@@ -37,8 +37,8 @@ class StorageService
             $decoded = base64_decode($data);
             $extension = str_contains($type, 'png') ? 'png' : (str_contains($type, 'webp') ? 'webp' : 'jpg');
             $filename = Str::uuid() . '.' . $extension;
-            Storage::put("public/{$folder}/{$filename}", $decoded);
-            return Storage::url("public/{$folder}/{$filename}");
+            Storage::disk('public')->put("{$folder}/{$filename}", $decoded);
+            return Storage::disk('public')->url("{$folder}/{$filename}");
         }
 
         // Return path as is if already a safe URL or relative path

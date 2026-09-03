@@ -167,26 +167,32 @@ class ReportController extends Controller
 
         $category = ReportCategory::findOrFail($validated['category_id']);
 
-        return DB::transaction(function () use ($request, $user, $validated, $category) {
-            // Generate report number (WL-2026-XXXXXX)
-            $countThisYear = Report::whereYear('created_at', now()->year)->count() + 1;
-            $reportNumber = sprintf('WL-%s-%06d', now()->format('Y'), $countThisYear);
+        // Step 1: Run AI Analysis (outside DB transaction to avoid connection lock during HTTP request)
+        $aiResult = $this->aiService->analyze(
+            $validated['title'],
+            $validated['description'],
+            $category->name
+        );
 
-            // Step 1: Run AI Analysis
-            $aiResult = $this->aiService->analyze(
-                $validated['title'],
-                $validated['description'],
-                $category->name
-            );
+        // Step 2: Determine Priority & SLA
+        $priority = $this->priorityEngine->determinePriority(
+            $category->id,
+            $aiResult['severity'] ?? null,
+            $aiResult['priority'] ?? null
+        );
 
-            // Step 2: Determine Priority & SLA
-            $priority = $this->priorityEngine->determinePriority(
-                $category->id,
-                $aiResult['severity'] ?? null,
-                $aiResult['priority'] ?? null
-            );
+        $deadline = $this->slaService->calculateDeadline($priority);
 
-            $deadline = $this->slaService->calculateDeadline($priority);
+        return DB::transaction(function () use ($request, $user, $validated, $category, $aiResult, $priority, $deadline) {
+            // Generate collision-safe report number (WL-2026-XXXXXX)
+            $nextSeq = (Report::whereYear('created_at', now()->year)->max('id') ?? 0) + 1;
+            do {
+                $reportNumber = sprintf('WL-%s-%06d', now()->format('Y'), $nextSeq);
+                $exists = Report::where('report_number', $reportNumber)->exists();
+                if ($exists) {
+                    $nextSeq++;
+                }
+            } while ($exists);
 
             // Step 3: Create Report Record
             $report = Report::create([
