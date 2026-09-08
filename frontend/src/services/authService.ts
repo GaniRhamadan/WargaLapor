@@ -77,12 +77,12 @@ export const authService = {
     }
   },
 
-  async forgotPassword(email: string): Promise<{ message: string; demo_otp?: string }> {
-    const res = await api.post<{ message: string; demo_otp?: string }>('/auth/forgot-password', { email });
+  async forgotPassword(email: string): Promise<{ message: string; identifier?: string; channel?: string; expires_at?: string; demo_otp?: string }> {
+    const res = await api.post<{ message: string; identifier?: string; channel?: string; expires_at?: string; demo_otp?: string }>('/auth/forgot-password', { email });
     return res.data;
   },
 
-  async resetPassword(data: { email: string; otp_code?: string; password: string; password_confirmation: string }): Promise<{ message: string }> {
+  async resetPassword(data: { email: string; otp_code: string; password: string; password_confirmation: string }): Promise<{ message: string }> {
     const res = await api.post<{ message: string }>('/auth/reset-password', data);
     return res.data;
   },

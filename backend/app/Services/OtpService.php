@@ -42,10 +42,13 @@ class OtpService
         $channel = $isPhone ? 'WhatsApp / SMS' : 'Email Aktif';
 
         if ($user) {
+            $isForgot = ($type === 'FORGOT_PASSWORD');
             Notification::create([
                 'user_id' => $user->id,
-                'title' => "Kode Verifikasi OTP WargaLapor: {$otpCode}",
-                'message' => "Kode OTP Anda adalah {$otpCode}. Berlaku 10 menit. Jangan berikan kode ini kepada siapapun demi keamanan akun Anda.",
+                'title' => $isForgot ? "Kode OTP Reset Kata Sandi WargaLapor: {$otpCode}" : "Kode Verifikasi OTP WargaLapor: {$otpCode}",
+                'message' => $isForgot
+                    ? "Kode OTP untuk mengatur ulang kata sandi Anda adalah {$otpCode}. Berlaku 10 menit. Jangan berikan kode ini kepada siapapun."
+                    : "Kode OTP Anda adalah {$otpCode}. Berlaku 10 menit. Jangan berikan kode ini kepada siapapun demi keamanan akun Anda.",
                 'type' => 'OTP_SECURITY',
                 'link' => null,
             ]);
@@ -54,23 +57,37 @@ class OtpService
         // Dispatch OTP directly to active Email address via SMTP
         if (!$isPhone) {
             try {
-                Mail::raw(
-                    "Halo Warga,\n\n" .
-                    "Terima kasih telah mendaftar di Portal WargaLapor.\n" .
-                    "Berikut adalah Kode Verifikasi OTP untuk aktivasi akun Anda:\n\n" .
-                    "=========================================\n" .
-                    "         KODE OTP ANDA: {$otpCode}\n" .
-                    "=========================================\n\n" .
-                    "Kode ini berlaku selama 10 menit.\n" .
-                    "PERINGATAN: Jangan berikan kode ini kepada pihak mana pun demi menjaga keamanan data Anda.\n\n" .
-                    "Salam hangat,\n" .
-                    "Pemerintah Kota & Tim Pengembang WargaLapor",
-                    function ($message) use ($identifier) {
-                        $message->to($identifier)
-                            ->subject('Kode Verifikasi OTP Akun WargaLapor - ' . $identifier);
-                    }
-                );
-                Log::info("Email OTP successfully dispatched via SMTP to {$identifier}");
+                if ($type === 'FORGOT_PASSWORD') {
+                    $subject = 'Kode OTP Reset Kata Sandi WargaLapor';
+                    $body = "Halo Warga,\n\n" .
+                        "Kami menerima permintaan untuk mengatur ulang kata sandi akun WargaLapor Anda ({$identifier}).\n" .
+                        "Berikut adalah Kode Verifikasi OTP untuk mereset kata sandi Anda:\n\n" .
+                        "=========================================\n" .
+                        "         KODE OTP ANDA: {$otpCode}\n" .
+                        "=========================================\n\n" .
+                        "Kode verifikasi ini berlaku selama 10 menit.\n" .
+                        "PERINGATAN: Jangan berikan kode ini kepada pihak mana pun demi menjaga keamanan data Anda. Jika Anda tidak merasa melakukan permintaan ini, silakan abaikan pesan ini.\n\n" .
+                        "Salam hangat,\n" .
+                        "Pemerintah Kota & Tim Pengembang WargaLapor";
+                } else {
+                    $subject = 'Kode Verifikasi OTP Akun WargaLapor - ' . $identifier;
+                    $body = "Halo Warga,\n\n" .
+                        "Terima kasih telah mendaftar di Portal WargaLapor.\n" .
+                        "Berikut adalah Kode Verifikasi OTP untuk aktivasi akun Anda:\n\n" .
+                        "=========================================\n" .
+                        "         KODE OTP ANDA: {$otpCode}\n" .
+                        "=========================================\n\n" .
+                        "Kode ini berlaku selama 10 menit.\n" .
+                        "PERINGATAN: Jangan berikan kode ini kepada pihak mana pun demi menjaga keamanan data Anda.\n\n" .
+                        "Salam hangat,\n" .
+                        "Pemerintah Kota & Tim Pengembang WargaLapor";
+                }
+
+                Mail::raw($body, function ($message) use ($identifier, $subject) {
+                    $message->to($identifier)
+                        ->subject($subject);
+                });
+                Log::info("Email OTP successfully dispatched via SMTP to {$identifier} for [{$type}]");
             } catch (\Throwable $e) {
                 Log::warning("SMTP email dispatch to {$identifier} failed: " . $e->getMessage() . " - Fallback demo mode available.");
             }

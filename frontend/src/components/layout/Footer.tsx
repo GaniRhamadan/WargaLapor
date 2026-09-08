@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, PhoneCall, Mail, MapPin, Heart } from 'lucide-react';
+import { PhoneCall, Mail, MapPin, Heart } from 'lucide-react';
+import { WargaLaporLogo } from '../common/WargaLaporLogo';
 
 export const Footer: React.FC = () => {
   return (
@@ -9,13 +10,12 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Col 1 & 2: Branding & Tagline */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center text-slate-900 shadow-md">
-                <Shield className="w-5 h-5" />
-              </div>
-              <span className="text-2xl font-black tracking-tight text-white">
-                Warga<span className="text-teal-400">Lapor</span>
-              </span>
+            <div className="flex items-center">
+              <img
+                src="/logo-white.png"
+                alt="WargaLapor — Smart Citizen Reporting"
+                className="h-11 w-auto object-contain"
+              />
             </div>
             <p className="text-slate-300 font-medium text-sm">
               “Laporkan Masalah. Pantau Prosesnya. Bangun Lingkungan Lebih Baik.”

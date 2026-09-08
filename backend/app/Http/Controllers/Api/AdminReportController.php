@@ -193,49 +193,79 @@ class AdminReportController extends Controller
             return response()->json(['message' => 'Akses ditolak.'], 403);
         }
 
-        $report = Report::with('latestAssignment')->findOrFail($id);
+        $report = Report::with(['latestAssignment.officer.user'])->findOrFail($id);
 
         $validated = $request->validate([
             'officer_id' => 'required|exists:officers,id',
-            'notes' => 'nullable|string',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         $officer = Officer::with('user')->findOrFail($validated['officer_id']);
 
-        // Check for duplicate assignment to same officer
-        $existing = ReportAssignment::where('report_id', $report->id)
-            ->where('officer_id', $officer->id)
-            ->whereIn('status', ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'])
-            ->first();
-        
-        if ($existing) {
-            return response()->json([
-                'message' => 'Petugas ini sudah ditugaskan pada laporan yang sama.',
-            ], 422);
-        }
+        return DB::transaction(function () use ($user, $report, $officer, $validated) {
+            // 1. If assigned to the same officer currently, simply update notes and refresh status
+            $existing = ReportAssignment::where('report_id', $report->id)
+                ->where('officer_id', $officer->id)
+                ->whereIn('status', ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'])
+                ->latest()
+                ->first();
 
-        // Unassign previous officer if exists
-        $previous = ReportAssignment::where('report_id', $report->id)
-            ->whereNotIn('status', ['COMPLETED', 'CANCELLED'])
-            ->orderBy('created_at', 'desc')
-            ->first();
-            
-        if ($previous && $previous->officer_id != $officer->id) {
-            $prevOfficer = Officer::find($previous->officer_id);
-            if ($prevOfficer && $prevOfficer->user) {
-                Notification::create([
-                    'user_id' => $prevOfficer->user_id,
-                    'title' => 'Penugasan Dibatalkan',
-                    'message' => "Anda dibebaskan dari penanganan laporan #{$report->report_number}.",
-                    'type' => 'STATUS_UPDATE',
-                    'link' => null,
+            if ($existing) {
+                if (!empty($validated['notes'])) {
+                    $existing->notes = $validated['notes'];
+                    $existing->assigned_by = $user->id;
+                    $existing->save();
+                }
+
+                if ($report->status === 'SUBMITTED' || $report->verification_status === 'PENDING') {
+                    $report->status = 'ASSIGNED';
+                    $report->verification_status = 'VERIFIED';
+                    $report->verified_at = now();
+                    $report->save();
+                }
+
+                ReportStatusHistory::create([
+                    'report_id' => $report->id,
+                    'status' => $report->status === 'SUBMITTED' ? 'ASSIGNED' : $report->status,
+                    'actor_id' => $user->id,
+                    'actor_name' => $user->name,
+                    'actor_role' => 'admin',
+                    'notes' => "Instruksi penugasan untuk {$officer->user->name} diperbarui. " . (!empty($validated['notes']) ? "Instruksi: {$validated['notes']}" : ''),
+                ]);
+
+                return response()->json([
+                    'message' => "Instruksi penugasan untuk {$officer->user->name} berhasil diperbarui.",
+                    'report' => $report->fresh(['category', 'latestAssignment.officer.user', 'statusHistories']),
                 ]);
             }
-            $previous->update(['status' => 'COMPLETED', 'completed_at' => now()]);
-            $prevOfficer->decrement('active_tasks_count');
-        }
 
-        return DB::transaction(function () use ($user, $report, $officer, $validated) {
+            // 2. If assigning a new or different officer, cancel any previous active assignments
+            $previousAssignments = ReportAssignment::where('report_id', $report->id)
+                ->whereNotIn('status', ['COMPLETED', 'CANCELLED'])
+                ->get();
+
+            foreach ($previousAssignments as $previous) {
+                if ($previous->officer_id != $officer->id) {
+                    $previous->update(['status' => 'CANCELLED', 'completed_at' => now()]);
+                    $prevOfficer = Officer::find($previous->officer_id);
+                    if ($prevOfficer) {
+                        if ($prevOfficer->active_tasks_count > 0) {
+                            $prevOfficer->decrement('active_tasks_count');
+                        }
+                        if ($prevOfficer->user_id) {
+                            Notification::create([
+                                'user_id' => $prevOfficer->user_id,
+                                'title' => 'Penugasan Dialihkan',
+                                'message' => "Penugasan laporan #{$report->report_number} telah dialihkan kepada petugas lain.",
+                                'type' => 'STATUS_UPDATE',
+                                'link' => null,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // 3. Create fresh assignment
             $assignment = ReportAssignment::create([
                 'report_id' => $report->id,
                 'officer_id' => $officer->id,
@@ -245,8 +275,8 @@ class AdminReportController extends Controller
                 'assigned_at' => now(),
             ]);
 
-            // Auto-verify when assigning from SUBMITTED state
-            if ($report->status === 'SUBMITTED') {
+            // Auto-verify when assigning from SUBMITTED or PENDING state
+            if ($report->status === 'SUBMITTED' || $report->verification_status === 'PENDING') {
                 $report->verification_status = 'VERIFIED';
                 $report->verified_at = now();
                 ReportStatusHistory::create([
@@ -270,7 +300,7 @@ class AdminReportController extends Controller
                 'actor_id' => $user->id,
                 'actor_name' => $user->name,
                 'actor_role' => 'admin',
-                'notes' => "Laporan ditugaskan kepada petugas {$officer->user->name} ({$officer->department}). " . ($validated['notes'] ? "Instruksi: {$validated['notes']}" : ''),
+                'notes' => "Laporan ditugaskan kepada petugas {$officer->user->name} ({$officer->department}). " . (!empty($validated['notes']) ? "Instruksi: {$validated['notes']}" : ''),
             ]);
 
             Notification::create([

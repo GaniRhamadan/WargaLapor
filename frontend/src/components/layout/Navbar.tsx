@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '../common/Button';
+import { WargaLaporLogo } from '../common/WargaLaporLogo';
 
 export const Navbar: React.FC = () => {
   const { user, logout, isAdmin, isOfficer, isCitizen } = useAuth();
@@ -62,27 +63,12 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18">
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white shadow-md shadow-teal-500/20 group-hover:scale-105 transition-transform">
-              <Shield className="w-5 h-5" />
-            </div>
-            <div>
-              <span
-                className={`text-xl font-black tracking-tight flex items-center gap-1 ${
-                  isHome ? 'text-white' : 'text-slate-900'
-                }`}
-              >
-                Warga<span className="text-teal-400">Lapor</span>
-                <span className="inline-block w-2 h-2 rounded-full bg-teal-400 ml-0.5"></span>
-              </span>
-              <p
-                className={`text-[10px] font-semibold -mt-1 hidden sm:block tracking-wider uppercase ${
-                  isHome ? 'text-slate-400' : 'text-slate-400'
-                }`}
-              >
-                Smart Citizen Reporting
-              </p>
-            </div>
+          <Link to="/" className="flex items-center group py-1">
+            <img
+              src={isHome ? '/logo-white.png' : '/logo.png'}
+              alt="WargaLapor — Smart Citizen Reporting"
+              className="h-10 sm:h-11 w-auto object-contain group-hover:scale-105 transition-transform"
+            />
           </Link>
 
           {/* Desktop Navigation */}

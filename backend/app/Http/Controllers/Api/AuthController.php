@@ -54,8 +54,8 @@ class AuthController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[a-zA-Z\s\.\,\'\-]+$/'],
             'email' => ['required', 'string', 'email:rfc,filter', 'max:255', 'unique:users,email'],
-            'phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
-            'nik' => ['nullable', 'string', 'regex:/^[0-9]{16}$/'],
+            'phone' => ['required', 'string', 'max:15', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'nik' => ['nullable', 'string', 'size:16', 'regex:/^[0-9]{16}$/'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
             'security_token' => ['nullable', 'string'],
             'security_answer' => ['nullable'],
@@ -63,7 +63,9 @@ class AuthController extends Controller
             'name.regex' => 'Nama lengkap hanya boleh memuat huruf dan tanda baca umum.',
             'email.email' => 'Format alamat email tidak valid atau domain tidak aktif.',
             'phone.required' => 'Nomor HP/WhatsApp aktif wajib diisi untuk verifikasi OTP.',
+            'phone.max' => 'Nomor HP/WhatsApp maksimal 15 karakter.',
             'phone.regex' => 'Format nomor HP tidak valid (contoh format Indonesia: 08123456789 atau +628123456789).',
+            'nik.size' => 'NIK harus berupa tepat 16 digit angka sesuai KTP.',
             'nik.regex' => 'NIK harus berupa 16 digit angka sesuai KTP.',
             'password.min' => 'Kata sandi minimal 6 karakter.',
             'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
@@ -191,6 +193,12 @@ class AuthController extends Controller
 
         $user = User::where('email', $identifier)->orWhere('phone', $identifier)->first();
 
+        if ($type === 'FORGOT_PASSWORD' && !$user) {
+            return response()->json([
+                'message' => 'Alamat email tidak terdaftar dalam sistem.',
+            ], 404);
+        }
+
         $result = $this->otpService->generateAndSend($identifier, $type, $user, $request->ip());
 
         return response()->json([
@@ -241,6 +249,7 @@ class AuthController extends Controller
         } else {
             $user = User::where('email', $emailOrPhone)
                 ->orWhere('phone', $emailOrPhone)
+                ->orWhere('nik', $emailOrPhone)
                 ->with('officerProfile')
                 ->first();
         }
@@ -330,10 +339,15 @@ class AuthController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|required|string|min:3|max:100',
-            'phone' => 'nullable|string|max:20',
-            'nik' => 'nullable|string|size:16',
+            'phone' => 'nullable|string|max:15|regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/',
+            'nik' => 'nullable|string|size:16|regex:/^[0-9]{16}$/',
             'avatar' => 'nullable|string',
             'password' => 'nullable|string|min:6|confirmed',
+        ], [
+            'phone.max' => 'Nomor telepon maksimal 15 digit.',
+            'phone.regex' => 'Format nomor telepon tidak valid (contoh: 081234567890).',
+            'nik.size' => 'NIK harus berupa tepat 16 digit angka sesuai KTP.',
+            'nik.regex' => 'NIK harus berupa 16 digit angka sesuai KTP.',
         ]);
 
         if (isset($validated['name'])) $user->name = $validated['name'];
@@ -375,19 +389,23 @@ class AuthController extends Controller
      */
     public function forgotPassword(Request $request): JsonResponse
     {
-        $request->validate(['email' => 'required|email']);
-        $user = User::where('email', strtolower($request->email))->first();
+        $request->validate(['email' => 'required|email'], [
+            'email.required' => 'Alamat email akun wajib diisi.',
+            'email.email' => 'Format alamat email tidak valid.',
+        ]);
+
+        $user = User::where('email', strtolower(trim($request->email)))->first();
 
         if (!$user) {
             return response()->json([
-                'message' => 'Jika email terdaftar, instruksi verifikasi OTP telah dikirimkan ke alamat email Anda.',
-            ]);
+                'message' => 'Alamat email tidak terdaftar dalam sistem. Pastikan email Anda sudah benar atau lakukan pendaftaran akun terlebih dahulu.',
+            ], 404);
         }
 
         $otpResult = $this->otpService->generateAndSend($user->email, 'FORGOT_PASSWORD', $user, $request->ip());
 
         return response()->json([
-            'message' => 'Kode OTP reset kata sandi telah dikirimkan ke email Anda.',
+            'message' => 'Kode OTP 6-digit untuk reset kata sandi telah dikirimkan ke email Gmail Anda (' . $user->email . ').',
             'identifier' => $user->email,
             'channel' => $otpResult['channel'],
             'expires_at' => $otpResult['expires_at'],
@@ -403,16 +421,24 @@ class AuthController extends Controller
             'email' => 'required|email',
             'otp_code' => 'required|string|size:6',
             'password' => 'required|string|min:6|confirmed',
+        ], [
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
+            'otp_code.required' => 'Kode OTP 6-digit wajib diisi.',
+            'otp_code.size' => 'Kode OTP harus berupa 6 digit angka.',
+            'password.required' => 'Kata sandi baru wajib diisi.',
+            'password.min' => 'Kata sandi minimal 6 karakter.',
+            'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
         ]);
 
-        $verifyResult = $this->otpService->verify(strtolower($request->email), $request->otp_code, 'FORGOT_PASSWORD');
+        $verifyResult = $this->otpService->verify(strtolower(trim($request->email)), $request->otp_code, 'FORGOT_PASSWORD');
         if (!$verifyResult['success']) {
             return response()->json([
                 'message' => $verifyResult['message'],
             ], 422);
         }
 
-        $user = User::where('email', strtolower($request->email))->first();
+        $user = User::where('email', strtolower(trim($request->email)))->first();
         if ($user) {
             $user->password = Hash::make($request->password);
             $user->failed_login_attempts = 0;
@@ -423,7 +449,7 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'message' => 'Kata sandi Anda berhasil diperbarui. Silakan login kembali dengan kata sandi baru.',
+            'message' => 'Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru.',
         ]);
     }
 }

@@ -171,4 +171,94 @@ class WargaLaporApiTest extends TestCase
         ]);
         $badCaptchaLogin->assertStatus(422);
     }
+
+    public function test_forgot_password_and_reset_flow_with_otp(): void
+    {
+        // 1. Non-existent email should return 404
+        $notFound = $this->postJson('/api/auth/forgot-password', [
+            'email' => 'unknown_user_123@example.com',
+        ]);
+        $notFound->assertStatus(404);
+
+        // 2. Existing user forgot password dispatches OTP
+        $forgotResponse = $this->postJson('/api/auth/forgot-password', [
+            'email' => 'warga@wargalapor.test',
+        ]);
+        $forgotResponse->assertStatus(200);
+
+        $otpRecord = \App\Models\OtpVerification::where('identifier', 'warga@wargalapor.test')
+            ->where('type', 'FORGOT_PASSWORD')
+            ->where('is_used', false)
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($otpRecord);
+        $this->assertEquals(6, strlen($otpRecord->otp_code));
+
+        // 3. Reset password with correct OTP
+        $resetResponse = $this->postJson('/api/auth/reset-password', [
+            'email' => 'warga@wargalapor.test',
+            'otp_code' => $otpRecord->otp_code,
+            'password' => 'newsecretpassword123',
+            'password_confirmation' => 'newsecretpassword123',
+        ]);
+        $resetResponse->assertStatus(200);
+
+        // 4. Verify login with new password
+        $loginResponse = $this->postJson('/api/auth/login', [
+            'email' => 'warga@wargalapor.test',
+            'password' => 'newsecretpassword123',
+        ]);
+        $loginResponse->assertStatus(200)
+            ->assertJsonStructure(['token', 'user']);
+    }
+
+    public function test_registration_validates_phone_and_nik_maximum_input(): void
+    {
+        // 1. Phone too long (> 15 chars) should fail with 422
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Warga Uji Coba',
+            'email' => 'testphone@wargalapor.test',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'phone' => '0812345678901234', // 16 digits
+            'nik' => '3171012304920001',
+        ]);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['phone']);
+
+        // 2. NIK not 16 digits should fail with 422
+        $responseNikTooLong = $this->postJson('/api/auth/register', [
+            'name' => 'Warga Uji Coba',
+            'email' => 'testnik@wargalapor.test',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'phone' => '081234567890',
+            'nik' => '317101230492000199', // 18 digits
+        ]);
+        $responseNikTooLong->assertStatus(422)
+            ->assertJsonValidationErrors(['nik']);
+
+        $responseNikTooShort = $this->postJson('/api/auth/register', [
+            'name' => 'Warga Uji Coba',
+            'email' => 'testnik2@wargalapor.test',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'phone' => '081234567890',
+            'nik' => '31710123049', // 11 digits
+        ]);
+        $responseNikTooShort->assertStatus(422)
+            ->assertJsonValidationErrors(['nik']);
+
+        // 3. Valid input (Phone <= 15 and NIK = 16) should succeed
+        $responseSuccess = $this->postJson('/api/auth/register', [
+            'name' => 'Warga Sukses',
+            'email' => 'wargasukses@wargalapor.test',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'phone' => '081234567890',
+            'nik' => '3171012304920001',
+        ]);
+        $responseSuccess->assertStatus(201);
+    }
 }

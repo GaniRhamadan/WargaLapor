@@ -30,6 +30,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { WargaLaporLogo } from '../common/WargaLaporLogo';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -72,18 +73,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         }`}
       >
         {/* Sidebar Header */}
-        <div className="h-18 px-6 border-b border-slate-100 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center text-white shadow-sm">
-              <Shield className="w-5 h-5" />
-            </div>
+        <div className="h-18 px-5 border-b border-slate-100 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src="/logo-icon.png" alt="WargaLapor Logo" className="w-8.5 h-8.5 object-contain shrink-0" />
             <div>
-              <span className="text-lg font-black tracking-tight text-slate-900">
+              <span className="text-base font-black tracking-tight text-slate-900 leading-tight block">
                 Warga<span className="text-teal-600">Lapor</span>
               </span>
-              <p className="text-[10px] font-semibold text-slate-400 -mt-1 uppercase tracking-wider">
+              <span className="inline-block text-[9px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded-md uppercase tracking-wider border border-teal-100/80">
                 {isAdmin ? 'Portal Admin' : isOfficer ? 'Portal Petugas' : 'Portal Warga'}
-              </p>
+              </span>
             </div>
           </Link>
 

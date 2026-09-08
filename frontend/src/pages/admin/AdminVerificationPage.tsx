@@ -14,7 +14,7 @@ import {
   FileCheck,
   MapPin,
   Sparkles,
-  User,
+  AlertCircle,
   XCircle,
 } from 'lucide-react';
 import { getImageUrl } from '../../utils/imageUtils';
@@ -31,6 +31,8 @@ export const AdminVerificationPage: React.FC = () => {
   const [adminNotes, setAdminNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const fetchPendingReports = () => {
     setLoading(true);
@@ -48,15 +50,20 @@ export const AdminVerificationPage: React.FC = () => {
     e.preventDefault();
     if (!selectedReport) return;
     setIsProcessing(true);
+    setActionError(null);
     try {
-      await adminService.verifyReport(selectedReport.id, {
+      const res = await adminService.verifyReport(selectedReport.id, {
         priority: overridePriority,
         notes: adminNotes || undefined,
       });
       setShowVerifyModal(false);
       setSelectedReport(null);
       setAdminNotes('');
+      setActionSuccess(res.message || 'Laporan berhasil diverifikasi.');
+      setTimeout(() => setActionSuccess(null), 4000);
       fetchPendingReports();
+    } catch (err: any) {
+      setActionError(err.response?.data?.message || 'Gagal memverifikasi laporan.');
     } finally {
       setIsProcessing(false);
     }
@@ -64,16 +71,25 @@ export const AdminVerificationPage: React.FC = () => {
 
   const handleReject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedReport || !rejectionReason.trim()) return;
+    if (!selectedReport) return;
+    if (!rejectionReason.trim()) {
+      setActionError('Alasan penolakan laporan wajib diisi.');
+      return;
+    }
     setIsProcessing(true);
+    setActionError(null);
     try {
-      await adminService.rejectReport(selectedReport.id, {
+      const res = await adminService.rejectReport(selectedReport.id, {
         reason: rejectionReason,
       });
       setShowRejectModal(false);
       setSelectedReport(null);
       setRejectionReason('');
+      setActionSuccess(res.message || 'Laporan berhasil ditolak.');
+      setTimeout(() => setActionSuccess(null), 4000);
       fetchPendingReports();
+    } catch (err: any) {
+      setActionError(err.response?.data?.message || 'Gagal menolak laporan.');
     } finally {
       setIsProcessing(false);
     }

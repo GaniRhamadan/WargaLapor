@@ -18,6 +18,10 @@ import {
   CheckCircle2,
   Calendar,
   Eye,
+  MoreVertical,
+  Copy,
+  Check,
+  AlertCircle,
 } from 'lucide-react';
 
 export const AdminReportsPage: React.FC = () => {
@@ -38,6 +42,34 @@ export const AdminReportsPage: React.FC = () => {
   const [selectedOfficerId, setSelectedOfficerId] = useState<number | null>(null);
   const [assignNotes, setAssignNotes] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  // 3-dots action menu state
+  const [activeMenuReportId, setActiveMenuReportId] = useState<number | null>(null);
+  const [copiedReportId, setCopiedReportId] = useState<number | null>(null);
+
+  // Close dropdown on click outside or Escape
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMenuReportId(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActiveMenuReportId(null);
+    };
+    window.addEventListener('click', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const handleCopyNumber = (reportNumber: string, id: number) => {
+    navigator.clipboard.writeText(reportNumber);
+    setCopiedReportId(id);
+    setTimeout(() => {
+      setCopiedReportId(null);
+      setActiveMenuReportId(null);
+    }, 1200);
+  };
 
   const fetchReports = () => {
     setLoading(true);
@@ -63,17 +95,33 @@ export const AdminReportsPage: React.FC = () => {
 
   const handleAssign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedReport || !selectedOfficerId) return;
+    if (!selectedReport) {
+      setAssignError('Data laporan tidak ditemukan.');
+      return;
+    }
+    if (!selectedOfficerId) {
+      setAssignError('Silakan pilih salah satu petugas dari daftar.');
+      return;
+    }
     setIsAssigning(true);
+    setAssignError(null);
     try {
-      await adminService.assignOfficer(selectedReport.id, {
+      const res = await adminService.assignOfficer(selectedReport.id, {
         officer_id: selectedOfficerId,
         notes: assignNotes || undefined,
       });
       setShowAssignModal(false);
       setSelectedReport(null);
       setAssignNotes('');
+      setSuccessMsg(res.message || 'Petugas berhasil ditugaskan.');
+      setTimeout(() => setSuccessMsg(null), 5000);
       fetchReports();
+    } catch (err: any) {
+      setAssignError(
+        err.response?.data?.message ||
+        err.response?.data?.errors?.officer_id?.[0] ||
+        'Gagal menugaskan petugas. Silakan coba kembali.'
+      );
     } finally {
       setIsAssigning(false);
     }
@@ -89,6 +137,21 @@ export const AdminReportsPage: React.FC = () => {
           Database komprehensif aduan warga, pemantauan status pengerjaan, dan penugasan petugas
         </p>
       </div>
+
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between gap-3 shadow-xs animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span className="font-bold">{successMsg}</span>
+          </div>
+          <button
+            onClick={() => setSuccessMsg(null)}
+            className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold underline cursor-pointer"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <Card className="p-4 space-y-3">
@@ -148,80 +211,156 @@ export const AdminReportsPage: React.FC = () => {
 
       {/* Reports Table */}
       <Card className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[380px]">
           <table className="w-full text-left text-xs text-slate-600">
             <thead className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-4">Nomor & Kategori</th>
-                <th className="px-5 py-4">Judul & Lokasi</th>
-                <th className="px-5 py-4">Prioritas</th>
-                <th className="px-5 py-4">Status</th>
-                <th className="px-5 py-4">Petugas Ditugaskan</th>
-                <th className="px-5 py-4 text-right">Aksi</th>
+                <th className="px-5 py-3.5 whitespace-nowrap">Nomor & Kategori</th>
+                <th className="px-5 py-3.5 whitespace-nowrap">Judul & Lokasi</th>
+                <th className="px-5 py-3.5 whitespace-nowrap">Prioritas</th>
+                <th className="px-5 py-3.5 whitespace-nowrap">Status</th>
+                <th className="px-5 py-3.5 whitespace-nowrap">Petugas Ditugaskan</th>
+                <th className="px-4 py-3.5 text-center whitespace-nowrap w-16">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     Memuat data laporan...
                   </td>
                 </tr>
               ) : reports.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     Tidak ada laporan yang cocok dengan filter.
                   </td>
                 </tr>
               ) : (
-                reports.map((r) => (
+                reports.map((r, index) => (
                   <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-5 py-4 font-medium">
-                      <div className="font-bold text-slate-900">{r.report_number}</div>
-                      <span className="text-[10px] text-teal-700 font-semibold">{r.category?.name}</span>
+                    <td className="px-5 py-3.5 whitespace-nowrap align-middle">
+                      <div className="font-mono font-bold text-slate-900 text-xs tracking-tight">
+                        {r.report_number}
+                      </div>
+                      <span className="inline-block text-[10px] text-teal-800 font-semibold bg-teal-50 border border-teal-200/60 px-2 py-0.5 rounded-md mt-1">
+                        {r.category?.name || 'Umum'}
+                      </span>
                     </td>
-                    <td className="px-5 py-4 max-w-xs">
-                      <div className="font-bold text-slate-900 truncate">{r.title}</div>
-                      <div className="text-[11px] text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                    <td className="px-5 py-3.5 align-middle min-w-[200px] max-w-xs">
+                      <div className="font-bold text-slate-900 truncate" title={r.title}>
+                        {r.title}
+                      </div>
+                      <div
+                        className="text-[11px] text-slate-400 truncate flex items-center gap-1 mt-0.5"
+                        title={r.address}
+                      >
                         <MapPin className="w-3 h-3 text-teal-600 shrink-0" />
-                        {r.address}
+                        <span className="truncate">{r.address}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-3.5 whitespace-nowrap align-middle">
                       <PriorityBadge priority={r.priority} size="sm" />
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-3.5 whitespace-nowrap align-middle">
                       <StatusBadge status={r.status} size="sm" />
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-3.5 whitespace-nowrap align-middle">
                       {r.latest_assignment?.officer ? (
-                        <div className="text-slate-800 font-medium">
-                          <p className="font-bold">{r.latest_assignment.officer.user?.name}</p>
-                          <p className="text-[10px] text-slate-400">{r.latest_assignment.officer.department}</p>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                            {r.latest_assignment.officer.user?.name
+                              ? r.latest_assignment.officer.user.name.charAt(0).toUpperCase()
+                              : 'P'}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 text-xs leading-none">
+                              {r.latest_assignment.officer.user?.name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-1 leading-none">
+                              {r.latest_assignment.officer.department}
+                            </p>
+                          </div>
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic text-[11px]">Belum ditugaskan</span>
+                        <span className="inline-flex items-center text-slate-400 italic text-[11px] bg-slate-50 border border-slate-200/50 px-2 py-0.5 rounded">
+                          Belum ditugaskan
+                        </span>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link to={`/citizen/reports/${r.id}`} target="_blank" rel="noreferrer">
-                          <Button variant="ghost" size="sm" leftIcon={<Eye className="w-3.5 h-3.5 text-teal-600" />}>
-                            Detail
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          leftIcon={<UserCheck className="w-3.5 h-3.5" />}
-                          onClick={() => {
-                            setSelectedReport(r);
-                            setSelectedOfficerId(officers[0]?.id || null);
-                            setShowAssignModal(true);
+                    <td className="px-4 py-3.5 text-center whitespace-nowrap w-16 align-middle relative">
+                      <div className="relative inline-block text-left">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuReportId(activeMenuReportId === r.id ? null : r.id);
                           }}
+                          className={`p-1.5 rounded-lg border transition-all ${
+                            activeMenuReportId === r.id
+                              ? 'bg-teal-50 border-teal-300 text-teal-700 shadow-sm'
+                              : 'border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-500 hover:text-slate-800'
+                          }`}
+                          title="Menu Aksi"
+                          aria-label="Menu Aksi"
                         >
-                          Assign
-                        </Button>
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+
+                        {activeMenuReportId === r.id && (
+                          <div
+                            className={`absolute right-0 ${
+                              index >= reports.length - 2 && reports.length > 2
+                                ? 'bottom-full mb-1.5'
+                                : 'top-full mt-1.5'
+                            } w-44 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 z-50 text-left`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Link
+                              to={`/citizen/reports/${r.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() => setActiveMenuReportId(null)}
+                              className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                              <span>Lihat Detail</span>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuReportId(null);
+                                setSelectedReport(r);
+                                setAssignError(null);
+                                const currentOfficerId = r.latest_assignment?.officer_id;
+                                setSelectedOfficerId(currentOfficerId || officers[0]?.id || null);
+                                setAssignNotes(r.latest_assignment?.notes || '');
+                                setShowAssignModal(true);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors text-left"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                              <span>Tugaskan Petugas</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyNumber(r.report_number, r.id)}
+                              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors text-left border-t border-slate-100 mt-1 pt-1.5"
+                            >
+                              {copiedReportId === r.id ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span className="text-emerald-600">Nomor Disalin!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span>Salin No. Laporan</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -235,11 +374,24 @@ export const AdminReportsPage: React.FC = () => {
       {/* ASSIGN OFFICER MODAL */}
       <Modal
         isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
+        onClose={() => {
+          setShowAssignModal(false);
+          setAssignError(null);
+        }}
         title={`Tugaskan Petugas untuk #${selectedReport?.report_number}`}
         maxWidth="lg"
       >
         <form onSubmit={handleAssign} className="space-y-4">
+          {assignError && (
+            <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-start gap-2.5 animate-shake">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+              <div className="space-y-0.5">
+                <p className="font-bold text-rose-800">Gagal Menugaskan Petugas</p>
+                <p className="text-rose-700">{assignError}</p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1">
             <h4 className="text-sm font-bold text-slate-900">{selectedReport?.title}</h4>
             <p className="text-xs text-slate-500">{selectedReport?.address}</p>
@@ -253,10 +405,14 @@ export const AdminReportsPage: React.FC = () => {
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {officers.map((off) => {
                 const isSelected = selectedOfficerId === off.id;
+                const isCurrentOfficer = selectedReport?.latest_assignment?.officer_id === off.id;
                 return (
                   <div
                     key={off.id}
-                    onClick={() => setSelectedOfficerId(off.id)}
+                    onClick={() => {
+                      setSelectedOfficerId(off.id);
+                      setAssignError(null);
+                    }}
                     className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
                       isSelected
                         ? 'border-teal-600 bg-teal-50/40 ring-2 ring-teal-600/10'
@@ -269,6 +425,11 @@ export const AdminReportsPage: React.FC = () => {
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                           {off.status}
                         </span>
+                        {isCurrentOfficer && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-100 text-teal-800">
+                            Petugas Saat Ini
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         {off.department} • {off.unit || 'Tim Reaksi Cepat'}

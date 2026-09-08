@@ -7,12 +7,14 @@ interface AntiBotChallengeProps {
   onChallengeChange: (data: { token: string; answer: string; isValid: boolean }) => void;
   honeypotValue: string;
   setHoneypotValue: (val: string) => void;
+  compact?: boolean;
 }
 
 export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
   onChallengeChange,
   honeypotValue,
   setHoneypotValue,
+  compact = false,
 }) => {
   const [challenge, setChallenge] = useState<SecurityChallenge | null>(null);
   const [answer, setAnswer] = useState('');
@@ -54,19 +56,35 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
   };
 
   return (
-    <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-3 transition-all shadow-xs">
+    <div
+      className={`${
+        compact
+          ? 'p-2.5 rounded-xl bg-slate-50/90 border border-slate-200 space-y-1.5'
+          : 'p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-3'
+      } transition-all shadow-xs`}
+    >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-xs">
-            <ShieldCheck className="w-4 h-4" />
+        <div className="flex items-center gap-1.5">
+          <div
+            className={`${
+              compact ? 'w-5 h-5 rounded-md' : 'w-7 h-7 rounded-xl'
+            } bg-teal-600 text-white flex items-center justify-center shadow-xs`}
+          >
+            <ShieldCheck className={compact ? 'w-3 h-3' : 'w-4 h-4'} />
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-800 block leading-tight">
-              Verifikasi Keamanan CAPTCHA
+            <span
+              className={`${
+                compact ? 'text-[11px]' : 'text-xs'
+              } font-bold text-slate-800 block leading-tight`}
+            >
+              Verifikasi CAPTCHA
             </span>
-            <span className="text-[11px] text-slate-500 font-medium">
-              Proteksi Anti-Bot & Scraper
-            </span>
+            {!compact && (
+              <span className="text-[11px] text-slate-500 font-medium">
+                Proteksi Anti-Bot & Scraper
+              </span>
+            )}
           </div>
         </div>
 
@@ -74,10 +92,12 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
           type="button"
           onClick={fetchChallenge}
           disabled={loading}
-          className="text-xs text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100/80 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-colors border border-teal-200/60 cursor-pointer disabled:opacity-50"
+          className={`${
+            compact ? 'text-[10px] px-2 py-0.5' : 'text-xs px-2.5 py-1'
+          } text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100/80 rounded-lg font-semibold flex items-center gap-1 transition-all duration-150 border border-teal-200/60 hover:border-teal-300 active:scale-95 cursor-pointer disabled:opacity-50`}
           title="Ganti Gambar CAPTCHA"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${loading ? 'animate-spin' : ''}`} />
           <span>Ganti</span>
         </button>
       </div>
@@ -102,17 +122,19 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
       </div>
 
       {/* Visual CAPTCHA Image & User Input Box */}
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+      <div className={`grid grid-cols-12 ${compact ? 'gap-2' : 'gap-3'} items-center`}>
         {/* Visual Distorted Image Container */}
         <div
           onClick={fetchChallenge}
           title="Klik gambar untuk memuat ulang CAPTCHA"
-          className="sm:col-span-7 h-14 rounded-xl overflow-hidden bg-[#141826] border border-slate-800 flex items-center justify-center cursor-pointer select-none shadow-inner relative group"
+          className={`col-span-7 ${
+            compact ? 'h-10 sm:h-11 rounded-lg' : 'h-14 rounded-xl'
+          } overflow-hidden bg-[#141826] border border-slate-800 hover:border-teal-500/60 transition-colors duration-200 flex items-center justify-center cursor-pointer select-none shadow-inner relative group`}
         >
           {loading ? (
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <RefreshCw className="w-4 h-4 animate-spin text-teal-400" />
-              <span>Membuat CAPTCHA...</span>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-400" />
+              <span>Memuat...</span>
             </div>
           ) : challenge?.captcha_image ? (
             <>
@@ -121,17 +143,17 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
                 alt="Kode Verifikasi CAPTCHA"
                 className="w-full h-full object-cover pointer-events-none"
               />
-              <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white/90 font-medium backdrop-blur-[1px]">
-                Klik untuk ganti
+              <div className="absolute inset-0 bg-slate-950/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[9px] text-white/90 font-medium backdrop-blur-[1px]">
+                Ganti
               </div>
             </>
           ) : (
-            <span className="text-rose-400 text-xs font-semibold">Gagal memuat CAPTCHA</span>
+            <span className="text-rose-400 text-[10px] font-semibold">Gagal memuat</span>
           )}
         </div>
 
         {/* Input Box for 5-digit CAPTCHA */}
-        <div className="sm:col-span-5 relative">
+        <div className="col-span-5 relative">
           <input
             type="text"
             required
@@ -143,17 +165,27 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
             placeholder="KODE..."
             value={answer}
             onChange={(e) => handleAnswerChange(e.target.value)}
-            className="w-full h-14 text-base px-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white font-mono font-black tracking-widest text-center uppercase text-slate-800 placeholder:text-slate-400 placeholder:font-sans placeholder:tracking-normal placeholder:font-medium placeholder:text-xs"
+            className={`w-full ${
+              compact ? 'h-10 sm:h-11 text-sm' : 'h-14 text-base'
+            } px-2 rounded-lg border border-slate-300 focus:ring-4 focus:ring-teal-500/15 focus:border-teal-500 outline-none bg-white font-mono font-bold tracking-widest text-center uppercase text-slate-800 placeholder:text-slate-400 placeholder:font-sans placeholder:tracking-normal placeholder:font-medium placeholder:text-[11px] transition-all duration-200`}
           />
           {isAnswered && (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 absolute right-3 top-5 pointer-events-none" />
+            <CheckCircle2
+              className={`${
+                compact ? 'w-3.5 h-3.5 right-1.5 top-3.5' : 'w-4 h-4 right-3 top-5'
+              } text-emerald-600 absolute pointer-events-none transition-transform animate-scale-up`}
+            />
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-0.5">
-        <Lock className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-        <span>Ketik 5 karakter di atas untuk verifikasi keamanan non-bot.</span>
+      <div
+        className={`flex items-center gap-1 ${
+          compact ? 'text-[10px]' : 'text-[11px]'
+        } text-slate-400 pt-0.5`}
+      >
+        <Lock className={compact ? 'w-3 h-3 text-teal-600 shrink-0' : 'w-3.5 h-3.5 text-teal-600 shrink-0'} />
+        <span>Ketik 5 karakter kode anti-bot</span>
       </div>
     </div>
   );

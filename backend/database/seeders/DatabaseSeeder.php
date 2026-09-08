@@ -553,18 +553,45 @@ class DatabaseSeeder extends Seeder
 
         // Add 12 more quick reports to enrich stats
         $additionalLocations = [
-            ['title' => 'Coretan Vandalisme di Halte Busway Tosari', 'cat' => $catModels['fasilitas-umum'], 'lat' => -6.1970, 'lng' => 106.8230, 'p' => 'LOW', 'st' => 'RESOLVED'],
-            ['title' => 'Rambu Dilarang Putar Balik Miring Tertabrak Truk', 'cat' => $catModels['lalu-lintas'], 'lat' => -6.2210, 'lng' => 106.8410, 'p' => 'MEDIUM', 'st' => 'RESOLVED'],
-            ['title' => 'Sampah Sisa Pasar Malam Berserakan di Lapangan', 'cat' => $catModels['sampah-kebersihan'], 'lat' => -6.2750, 'lng' => 106.8120, 'p' => 'MEDIUM', 'st' => 'IN_PROGRESS'],
-            ['title' => 'Aspal Amblas Dekat Rel Kereta Api Senen', 'cat' => $catModels['jalan-rusak'], 'lat' => -6.1780, 'lng' => 106.8450, 'p' => 'HIGH', 'st' => 'ASSIGNED'],
-            ['title' => 'Lampu Penyeberangan Zebra Cross Rusak', 'cat' => $catModels['lampu-jalan'], 'lat' => -6.1890, 'lng' => 106.8150, 'p' => 'MEDIUM', 'st' => 'VERIFIED'],
-            ['title' => 'Saluran Air Limbah Meluber ke Halaman Warga', 'cat' => $catModels['banjir-drainase'], 'lat' => -6.2550, 'lng' => 106.8650, 'p' => 'HIGH', 'st' => 'IN_PROGRESS'],
-            ['title' => 'Pohon Akasia Kering Condong ke Kabel Telepon', 'cat' => $catModels['pohon-tumbang'], 'lat' => -6.2380, 'lng' => 106.8010, 'p' => 'HIGH', 'st' => 'RESOLVED'],
-            ['title' => 'Kran Fasilitas Cuci Tangan Taman Kota Patah', 'cat' => $catModels['fasilitas-umum'], 'lat' => -6.1920, 'lng' => 106.8390, 'p' => 'LOW', 'st' => 'RESOLVED'],
-            ['title' => 'Pintu Gerbang SMPN 19 Rusak Engselnya', 'cat' => $catModels['fasilitas-sekolah'], 'lat' => -6.2410, 'lng' => 106.7950, 'p' => 'LOW', 'st' => 'RESOLVED'],
-            ['title' => 'Pipa Induk PDAM Pecah Semburan Air 1 Meter', 'cat' => $catModels['air-bersih'], 'lat' => -6.1620, 'lng' => 106.8720, 'p' => 'CRITICAL', 'st' => 'RESOLVED'],
-            ['title' => 'Penutup Selokan Beton Pecah di Depan Puskesmas', 'cat' => $catModels['jalan-rusak'], 'lat' => -6.2150, 'lng' => 106.8600, 'p' => 'HIGH', 'st' => 'ASSIGNED'],
-            ['title' => 'Lampu Taman Interaktif Monas Mati Sebagian', 'cat' => $catModels['lampu-jalan'], 'lat' => -6.1754, 'lng' => 106.8272, 'p' => 'LOW', 'st' => 'RESOLVED'],
+            // --- KLASTER 1: DUKUH ATAS & SUDIRMAN (Jakarta Pusat - Kepadatan Kritis) ---
+            ['title' => 'Coretan Vandalisme di Halte Busway Tosari', 'cat' => $catModels['fasilitas-umum'], 'lat' => -6.1970, 'lng' => 106.8230, 'p' => 'LOW', 'st' => 'RESOLVED', 'addr' => 'Halte Tosari ICBC, Menteng', 'dist' => 'Tanah Abang'],
+            ['title' => 'Genangan Air Deras Underpass Dukuh Atas Saat Hujan', 'cat' => $catModels['banjir-drainase'], 'lat' => -6.2095, 'lng' => 106.8215, 'p' => 'CRITICAL', 'st' => 'IN_PROGRESS', 'addr' => 'Underpass Dukuh Atas, Jl. Galunggung', 'dist' => 'Setiabudi'],
+            ['title' => 'Pembatas Jalur Sepeda Sudirman Lepas Membahayakan', 'cat' => $catModels['lalu-lintas'], 'lat' => -6.2045, 'lng' => 106.8232, 'p' => 'HIGH', 'st' => 'VERIFIED', 'addr' => 'Jl. Jend. Sudirman KM 2.5', 'dist' => 'Tanah Abang'],
+            ['title' => 'Tutup Saluran Air Trotoar Stasiun MRT Dukuh Atas Hilang', 'cat' => $catModels['jalan-rusak'], 'lat' => -6.2078, 'lng' => 106.8235, 'p' => 'CRITICAL', 'st' => 'ASSIGNED', 'addr' => 'Pintu B MRT Dukuh Atas BNI', 'dist' => 'Tanah Abang'],
+            ['title' => 'Kabel Fiber Optik Menjuntai Rendah di JPO Sudirman', 'cat' => $catModels['fasilitas-umum'], 'lat' => -6.2020, 'lng' => 106.8238, 'p' => 'HIGH', 'st' => 'IN_PROGRESS', 'addr' => 'JPO Karet Sudirman', 'dist' => 'Tanah Abang'],
+            ['title' => 'Lampu Sorot Penyeberangan Orang Padam', 'cat' => $catModels['lampu-jalan'], 'lat' => -6.2060, 'lng' => 106.8222, 'p' => 'MEDIUM', 'st' => 'ASSIGNED', 'addr' => 'Jl. Kendal No. 12, Menteng', 'dist' => 'Menteng'],
+
+            // --- KLASTER 2: SENEN & KRAMAT RAYA (Jakarta Pusat - Kepadatan Tinggi) ---
+            ['title' => 'Aspal Amblas Dekat Rel Kereta Api Senen', 'cat' => $catModels['jalan-rusak'], 'lat' => -6.1780, 'lng' => 106.8450, 'p' => 'HIGH', 'st' => 'ASSIGNED', 'addr' => 'Perlintasan Rel Senen, Kramat Bunder', 'dist' => 'Senen'],
+            ['title' => 'Tumpukan Sampah Pasar Senen Meluber ke Bahu Jalan', 'cat' => $catModels['sampah-kebersihan'], 'lat' => -6.1768, 'lng' => 106.8465, 'p' => 'HIGH', 'st' => 'IN_PROGRESS', 'addr' => 'Jl. Stasiun Senen No. 4', 'dist' => 'Senen'],
+            ['title' => 'Lampu PJU Underpass Senen Mati Total Gelap Gulita', 'cat' => $catModels['lampu-jalan'], 'lat' => -6.1792, 'lng' => 106.8438, 'p' => 'CRITICAL', 'st' => 'ASSIGNED', 'addr' => 'Underpass Simpang Lima Senen', 'dist' => 'Senen'],
+            ['title' => 'Saluran Air Depan Pasar Inpres Senen Meluap ke Trotoar', 'cat' => $catModels['banjir-drainase'], 'lat' => -6.1760, 'lng' => 106.8455, 'p' => 'HIGH', 'st' => 'SUBMITTED', 'addr' => 'Jl. Kramat Raya Blok 3', 'dist' => 'Senen'],
+            ['title' => 'Trotoar Keramik Hancur Amblas Sepanjang 10 Meter', 'cat' => $catModels['jalan-rusak'], 'lat' => -6.1802, 'lng' => 106.8442, 'p' => 'MEDIUM', 'st' => 'VERIFIED', 'addr' => 'Jl. Kramat Raya Depan Kampus BSI', 'dist' => 'Senen'],
+
+            // --- KLASTER 3: TOMANG & GROGOL (Jakarta Barat - Kepadatan Tinggi) ---
+            ['title' => 'Pagar Pembatas JPO Tomang Rusak dan Berlubang Bahaya untuk Anak', 'cat' => $catModels['fasilitas-umum'], 'lat' => -6.1750, 'lng' => 106.7950, 'p' => 'HIGH', 'st' => 'SUBMITTED', 'addr' => 'JPO Tomang Raya', 'dist' => 'Grogol Petamburan'],
+            ['title' => 'Saluran Air Mampet Samping Flyover Tomang Bikin Banjir', 'cat' => $catModels['banjir-drainase'], 'lat' => -6.1738, 'lng' => 106.7962, 'p' => 'HIGH', 'st' => 'IN_PROGRESS', 'addr' => 'Jl. Tomang Raya No. 40', 'dist' => 'Grogol Petamburan'],
+            ['title' => 'Dahan Pohon Rindang Menutupi Rambu Flyover Grogol', 'cat' => $catModels['pohon-tumbang'], 'lat' => -6.1745, 'lng' => 106.7932, 'p' => 'HIGH', 'st' => 'RESOLVED', 'addr' => 'Simpang Kyai Tapa, Grogol', 'dist' => 'Grogol Petamburan'],
+            ['title' => 'Lubang Dalam Jalur Kanan Arah Roxy Membahayakan Motor', 'cat' => $catModels['jalan-rusak'], 'lat' => -6.1762, 'lng' => 106.7928, 'p' => 'CRITICAL', 'st' => 'ASSIGNED', 'addr' => 'Jl. Kyai Tapa No. 101', 'dist' => 'Grogol Petamburan'],
+
+            // --- KLASTER 4: RAWAMANGUN & PRAMUKA (Jakarta Timur - Kepadatan Sedang) ---
+            ['title' => 'Lampu Lalu Lintas Simpang Pemuda Berkedip Kuning Terus', 'cat' => $catModels['lalu-lintas'], 'lat' => -6.1950, 'lng' => 106.8820, 'p' => 'HIGH', 'st' => 'SUBMITTED', 'addr' => 'Perempatan Jl. Pemuda & Pramuka', 'dist' => 'Pulogadung'],
+            ['title' => 'Jalan Berlubang di Depan Jakarta International Velodrome', 'cat' => $catModels['jalan-rusak'], 'lat' => -6.1965, 'lng' => 106.8835, 'p' => 'MEDIUM', 'st' => 'VERIFIED', 'addr' => 'Jl. Balap Sepeda No. 8', 'dist' => 'Pulogadung'],
+            ['title' => 'Sampah Sisa Kuliner Berserakan di Trotoar Rawamangun', 'cat' => $catModels['sampah-kebersihan'], 'lat' => -6.1938, 'lng' => 106.8812, 'p' => 'MEDIUM', 'st' => 'RESOLVED', 'addr' => 'Jl. Paus No. 22', 'dist' => 'Pulogadung'],
+            ['title' => 'Tutup Selokan Beton Pecah di Depan Puskesmas', 'cat' => $catModels['jalan-rusak'], 'lat' => -6.2150, 'lng' => 106.8600, 'p' => 'HIGH', 'st' => 'ASSIGNED', 'addr' => 'Jl. Matraman Raya No. 90', 'dist' => 'Matraman'],
+
+            // --- KLASTER 5: MANGGARAI & TEBET (Jakarta Selatan - Kepadatan Sedang) ---
+            ['title' => 'Saluran Air Limbah Meluber ke Halaman Warga', 'cat' => $catModels['banjir-drainase'], 'lat' => -6.2115, 'lng' => 106.8510, 'p' => 'HIGH', 'st' => 'IN_PROGRESS', 'addr' => 'Jl. Bukit Duri Selatan No. 14', 'dist' => 'Tebet'],
+            ['title' => 'Pohon Akasia Kering Condong ke Kabel Telepon', 'cat' => $catModels['pohon-tumbang'], 'lat' => -6.2128, 'lng' => 106.8525, 'p' => 'HIGH', 'st' => 'RESOLVED', 'addr' => 'Jl. Tebet Raya No. 45', 'dist' => 'Tebet'],
+            ['title' => 'Pipa Induk PDAM Pecah Semburan Air 1 Meter', 'cat' => $catModels['air-bersih'], 'lat' => -6.2095, 'lng' => 106.8488, 'p' => 'CRITICAL', 'st' => 'RESOLVED', 'addr' => 'Jl. Tambak Samping Stasiun', 'dist' => 'Setiabudi'],
+
+            // --- TITIK PINGGIRAN KOTA / TERISOLASI (Zona Biru / Sejuk) ---
+            ['title' => 'Rambu Dilarang Putar Balik Miring Tertabrak Truk', 'cat' => $catModels['lalu-lintas'], 'lat' => -6.2210, 'lng' => 106.8410, 'p' => 'MEDIUM', 'st' => 'RESOLVED', 'addr' => 'Jl. Dr. Saharjo No. 12', 'dist' => 'Tebet'],
+            ['title' => 'Sampah Sisa Pasar Malam Berserakan di Lapangan', 'cat' => $catModels['sampah-kebersihan'], 'lat' => -6.2750, 'lng' => 106.8120, 'p' => 'MEDIUM', 'st' => 'IN_PROGRESS', 'addr' => 'Jl. Margasatwa Raya', 'dist' => 'Pasar Minggu'],
+            ['title' => 'Lampu Penyeberangan Zebra Cross Rusak', 'cat' => $catModels['lampu-jalan'], 'lat' => -6.1890, 'lng' => 106.8150, 'p' => 'MEDIUM', 'st' => 'VERIFIED', 'addr' => 'Jl. Kebon Sirih No. 67', 'dist' => 'Menteng'],
+            ['title' => 'Kran Fasilitas Cuci Tangan Taman Kota Patah', 'cat' => $catModels['fasilitas-umum'], 'lat' => -6.1920, 'lng' => 106.8390, 'p' => 'LOW', 'st' => 'RESOLVED', 'addr' => 'Taman Suropati', 'dist' => 'Menteng'],
+            ['title' => 'Pintu Gerbang SMPN 19 Rusak Engselnya', 'cat' => $catModels['fasilitas-sekolah'], 'lat' => -6.2410, 'lng' => 106.7950, 'p' => 'LOW', 'st' => 'RESOLVED', 'addr' => 'Jl. Bumi No. 20', 'dist' => 'Kebayoran Baru'],
+            ['title' => 'Lampu Taman Interaktif Monas Mati Sebagian', 'cat' => $catModels['lampu-jalan'], 'lat' => -6.1754, 'lng' => 106.8272, 'p' => 'LOW', 'st' => 'RESOLVED', 'addr' => 'Komplek Monas Silang Barat', 'dist' => 'Gambir'],
         ];
 
         foreach ($additionalLocations as $idx => $loc) {
@@ -574,17 +601,18 @@ class DatabaseSeeder extends Seeder
                 'user_id' => $warga1->id,
                 'category_id' => $loc['cat']->id,
                 'title' => $loc['title'],
-                'description' => 'Laporan fasilitas lingkungan warga mengenai ' . $loc['title'] . '. Memerlukan perhatian dari petugas wilayah setempat.',
+                'description' => 'Laporan fasilitas lingkungan warga mengenai ' . $loc['title'] . '. Memerlukan perhatian dari dinas dan petugas wilayah terkait.',
                 'latitude' => $loc['lat'],
                 'longitude' => $loc['lng'],
-                'address' => 'Jl. Wilayah DKI Jakarta, Titik ' . ($idx + 1),
-                'city' => 'DKI Jakarta',
+                'address' => $loc['addr'] ?? ('Jl. Wilayah DKI Jakarta, Titik ' . ($idx + 1)),
+                'district' => $loc['dist'] ?? 'DKI Jakarta',
+                'city' => 'Kota Administrasi Jakarta',
                 'priority' => $loc['p'],
                 'status' => $loc['st'],
                 'verification_status' => $loc['st'] === 'SUBMITTED' ? 'PENDING' : 'VERIFIED',
                 'sla_deadline' => now()->addHours(24),
                 'resolved_at' => $loc['st'] === 'RESOLVED' ? now()->subHours(12) : null,
-                'created_at' => now()->subDays(rand(1, 10)),
+                'created_at' => now()->subDays(rand(1, 8)),
             ]);
 
             ReportImage::create([

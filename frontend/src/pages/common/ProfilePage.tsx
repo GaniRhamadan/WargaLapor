@@ -16,6 +16,23 @@ export const ProfilePage: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    if (val.startsWith('+')) {
+      val = '+' + val.slice(1).replace(/\D/g, '');
+    } else {
+      val = val.replace(/\D/g, '');
+    }
+    if (val.length <= 15) {
+      setPhone(val);
+    }
+  };
+
+  const handleNikChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 16);
+    setNik(val);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -23,6 +40,16 @@ export const ProfilePage: React.FC = () => {
 
     if (password && password !== passwordConfirmation) {
       setErrorMsg('Konfirmasi kata sandi tidak cocok.');
+      return;
+    }
+
+    if (phone && (phone.length < 10 || phone.length > 15)) {
+      setErrorMsg('Nomor telepon harus antara 10 hingga 15 digit.');
+      return;
+    }
+
+    if (nik && nik.length !== 16) {
+      setErrorMsg('NIK harus terdiri dari tepat 16 digit angka sesuai KTP.');
       return;
     }
 
@@ -98,32 +125,60 @@ export const ProfilePage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Nomor Telepon</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">Nomor Telepon</label>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {phone.length}/15 digit
+                </span>
+              </div>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="tel"
+                  maxLength={15}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="081234567890"
-                  className="w-full text-xs pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none"
+                  onChange={handlePhoneChange}
+                  placeholder="Contoh: 081234567890"
+                  className="w-full text-xs pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none font-mono"
                 />
               </div>
+              <p className="text-[10px] text-slate-400">Maksimal 15 digit (08... atau +628...)</p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">NIK (16 Digit)</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">NIK (16 Digit)</label>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${
+                    nik.length === 16
+                      ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200'
+                      : nik.length > 0
+                      ? 'bg-amber-50 text-amber-700 font-medium border border-amber-200'
+                      : 'text-slate-400'
+                  }`}
+                >
+                  {nik.length}/16 digit
+                </span>
+              </div>
               <div className="relative">
                 <IdCard className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="text"
+                  inputMode="numeric"
                   maxLength={16}
                   value={nik}
-                  onChange={(e) => setNik(e.target.value)}
+                  onChange={handleNikChange}
                   placeholder="3171012304920001"
-                  className="w-full text-xs pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none"
+                  className="w-full text-xs pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none font-mono tracking-wide"
                 />
               </div>
+              {nik.length > 0 && nik.length < 16 ? (
+                <p className="text-[10px] text-amber-600 font-medium">
+                  NIK harus tepat 16 digit angka (kurang {16 - nik.length} digit).
+                </p>
+              ) : (
+                <p className="text-[10px] text-slate-400">Maksimal 16 digit angka sesuai KTP</p>
+              )}
             </div>
           </div>
 

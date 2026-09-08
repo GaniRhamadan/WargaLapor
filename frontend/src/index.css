@@ -58,3 +58,68 @@
   backdrop-filter: blur(8px);
   border: 1px solid rgba(226, 232, 240, 0.8);
 }
+
+/* Auth Pages Smooth Entrance & Ambient Animations */
+@keyframes authCardIn {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes artFadeIn {
+  0% {
+    opacity: 0.88;
+    transform: scale(1.025);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ambientFloat {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(8px, -12px) scale(1.06);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-4px);
+  }
+  40%, 80% {
+    transform: translateX(4px);
+  }
+}
+
+.animate-auth-card {
+  animation: authCardIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-art-fade {
+  animation: artFadeIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-ambient-float {
+  animation: ambientFloat 14s ease-in-out infinite;
+}
+
+.animate-ambient-float-slow {
+  animation: ambientFloat 20s ease-in-out infinite reverse;
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
