@@ -78,6 +78,7 @@ export const LoginPage: React.FC = () => {
       }
     } catch (err: any) {
       setError(
+        err.message ||
         err.response?.data?.message ||
         err.response?.data?.errors?.email?.[0] ||
         'Gagal masuk. Periksa kembali email/NIK dan kata sandi Anda.'

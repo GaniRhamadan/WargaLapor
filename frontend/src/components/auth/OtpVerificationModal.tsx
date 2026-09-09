@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Mail, RefreshCw, AlertCircle, Lock } from 'lucide-react';
+import { ShieldCheck, Mail, RefreshCw, AlertCircle, Lock, CheckCircle2 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { authService } from '../../services/authService';
 
@@ -18,20 +18,14 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
   onVerified,
   onCancel,
 }) => {
-  const [length, setLength] = useState<number>(8); // Default 8 sesuai token Supabase, fleksibel 6 atau 8
-  const [otp, setOtp] = useState<string[]>(Array(8).fill(''));
+  const OTP_LENGTH = 6;
+  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(60);
   const [resendLoading, setResendLoading] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  const switchLength = (newLen: number) => {
-    setLength(newLen);
-    setOtp(Array(newLen).fill(''));
-    setError(null);
-    setTimeout(() => inputRefs.current[0]?.focus(), 50);
-  };
 
   useEffect(() => {
     inputRefs.current[0]?.focus();
@@ -44,52 +38,53 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
   }, []);
 
   const handleChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-
+    // Hanya izinkan angka
+    const digit = value.replace(/\D/g, '').slice(-1);
     const newOtp = [...otp];
-    newOtp[index] = value.slice(-1);
+    newOtp[index] = digit;
     setOtp(newOtp);
     setError(null);
 
-    // Auto-advance
-    if (value && index < length - 1) {
+    // Auto-advance ke input berikutnya
+    if (digit && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto submit jika semua digit terisi
+    // Auto submit jika semua 6 digit sudah terisi
     const fullCode = newOtp.join('');
-    if (fullCode.length === length && !newOtp.includes('')) {
+    if (fullCode.length === OTP_LENGTH && !newOtp.includes('')) {
       handleVerify(fullCode);
     }
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
+    if (e.key === 'Backspace') {
+      if (!otp[index] && index > 0) {
+        inputRefs.current[index - 1]?.focus();
+      }
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').trim().replace(/\D/g, '');
-    if (pastedData.length === 6 || pastedData.length === 8) {
-      setLength(pastedData.length);
+    const pastedData = e.clipboardData.getData('text').trim().replace(/\D/g, '').slice(0, OTP_LENGTH);
+    if (pastedData.length > 0) {
       const digits = pastedData.split('');
+      while (digits.length < OTP_LENGTH) digits.push('');
       setOtp(digits);
-      handleVerify(pastedData);
-    } else if (pastedData.length > 0) {
-      const targetLen = pastedData.length >= 8 ? 8 : 6;
-      setLength(targetLen);
-      const digits = pastedData.slice(0, targetLen).split('');
-      while (digits.length < targetLen) digits.push('');
-      setOtp(digits);
+      setError(null);
+      if (pastedData.length === OTP_LENGTH) {
+        handleVerify(pastedData);
+      } else {
+        inputRefs.current[pastedData.length]?.focus();
+      }
     }
   };
 
   const handleVerify = async (codeToVerify?: string) => {
     const fullCode = (codeToVerify || otp.join('')).trim();
-    if (fullCode.length < 6) {
-      setError('Harap masukkan kode OTP secara lengkap.');
+    if (fullCode.length !== OTP_LENGTH) {
+      setError('Harap masukkan tepat 6 digit kode OTP dari email Anda.');
       return;
     }
 
@@ -107,8 +102,11 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
       setError(
         err.message ||
         err.response?.data?.message ||
-        'Kode OTP tidak valid atau salah. Harap masukkan kode yang sesuai di email Anda.'
+        'Kode OTP tidak valid atau salah. Harap periksa email Anda kembali.'
       );
+      // Kosongkan digit jika salah untuk keamanan
+      setOtp(Array(OTP_LENGTH).fill(''));
+      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
@@ -118,10 +116,15 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
     if (resendCooldown > 0 || resendLoading) return;
     setResendLoading(true);
     setError(null);
+    setSuccessNotice(null);
 
     try {
-      await authService.resendOtp(identifier, 'REGISTER');
+      const res = await authService.resendOtp(identifier, 'REGISTER');
       setResendCooldown(60);
+      setSuccessNotice(res.message || 'Kode OTP baru telah berhasil dikirim ke email Anda.');
+      setOtp(Array(OTP_LENGTH).fill(''));
+      setTimeout(() => setSuccessNotice(null), 6000);
+      inputRefs.current[0]?.focus();
     } catch (err: any) {
       setError(err.message || 'Gagal mengirim ulang kode OTP. Silakan coba beberapa saat lagi.');
     } finally {
@@ -130,67 +133,46 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <div className="w-14 h-14 rounded-2xl bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center mx-auto shadow-sm">
-          <Lock className="w-7 h-7" />
+    <div className="space-y-5">
+      <div className="text-center space-y-1.5">
+        <div className="w-13 h-13 rounded-2xl bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center mx-auto shadow-xs">
+          <Lock className="w-6 h-6 text-teal-600" />
         </div>
         <h3 className="text-xl font-black text-slate-900 tracking-tight">
-          Verifikasi Kode OTP Akun Warga
+          Verifikasi Kode OTP Resmi
         </h3>
-        <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-          Masukkan kode keamanan yang telah kami kirimkan ke{' '}
-          <strong className="text-slate-900 font-semibold">{identifier}</strong>
-          {phone && (
-            <span> / WhatsApp <strong className="text-slate-900 font-semibold">{phone}</strong></span>
-          )}.
+        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+          Masukkan 6 digit kode OTP yang kami kirimkan ke kotak masuk email aktif Anda:
+        </p>
+        <p className="text-sm font-bold text-teal-700 bg-teal-50/80 px-3 py-1 rounded-xl inline-block border border-teal-200/60">
+          {identifier}
         </p>
       </div>
 
-      <div className="p-3 rounded-xl bg-teal-50/70 border border-teal-200/80 text-teal-900 text-xs flex items-center gap-2.5">
+      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600 text-xs flex items-center gap-2.5">
         <Mail className="w-4 h-4 text-teal-600 shrink-0" />
         <span className="leading-relaxed">
-          Kode OTP dikirim resmi dari <strong>parabu12siliwangi@gmail.com</strong> ke kotak masuk <strong>{identifier}</strong>.
+          Pengirim resmi: <strong className="text-slate-800">parabu12siliwangi@gmail.com</strong>
         </span>
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2 animate-shake">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span className="leading-tight font-medium">{error}</span>
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2 animate-shake shadow-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+          <span className="leading-tight font-semibold">{error}</span>
         </div>
       )}
 
-      {/* Pilihan Jumlah Digit (6 atau 8 Digit) */}
-      <div className="flex items-center justify-center gap-2 text-xs">
-        <span className="text-slate-500 text-[11px]">Format OTP di email:</span>
-        <button
-          type="button"
-          onClick={() => switchLength(8)}
-          className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
-            length === 8
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          8 Digit
-        </button>
-        <button
-          type="button"
-          onClick={() => switchLength(6)}
-          className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
-            length === 6
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          6 Digit
-        </button>
-      </div>
+      {successNotice && (
+        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+          <span className="leading-tight font-medium">{successNotice}</span>
+        </div>
+      )}
 
-      {/* Digit Inputs */}
+      {/* 6 Digit Inputs */}
       <div className="space-y-4">
-        <div className="flex justify-center items-center gap-1.5 sm:gap-2" onPaste={handlePaste}>
+        <div className="flex justify-center items-center gap-2 sm:gap-2.5" onPaste={handlePaste}>
           {otp.map((digit, idx) => (
             <input
               key={idx}
@@ -199,13 +181,14 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
               }}
               type="text"
               inputMode="numeric"
+              pattern="[0-9]*"
               maxLength={1}
               value={digit}
               onChange={(e) => handleChange(idx, e.target.value)}
               onKeyDown={(e) => handleKeyDown(idx, e)}
-              className={`w-9 h-12 sm:w-11 sm:h-13 text-center text-lg sm:text-xl font-black rounded-xl border-2 transition-all outline-none ${
+              className={`w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-black rounded-xl border-2 transition-all outline-none ${
                 digit
-                  ? 'border-teal-600 bg-teal-50/40 text-teal-900 shadow-sm'
+                  ? 'border-teal-600 bg-teal-50/50 text-teal-900 shadow-sm ring-2 ring-teal-500/20'
                   : 'border-slate-200 bg-white text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
               }`}
             />
@@ -217,12 +200,12 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
           variant="primary"
           size="md"
           isLoading={loading}
-          disabled={otp.join('').length !== length}
+          disabled={otp.join('').length !== OTP_LENGTH}
           onClick={() => handleVerify()}
-          className="w-full font-bold shadow-md shadow-teal-500/20 flex items-center justify-center gap-2"
+          className="w-full font-bold shadow-md shadow-teal-500/20 flex items-center justify-center gap-2 text-sm"
         >
           <ShieldCheck className="w-4 h-4" />
-          <span>Verifikasi & Aktifkan Akun</span>
+          <span>Verifikasi & Masuk Akun</span>
         </Button>
       </div>
 
@@ -236,7 +219,7 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
           className={`font-bold transition-colors flex items-center gap-1.5 ${
             resendCooldown > 0 || resendLoading
               ? 'text-slate-400 cursor-not-allowed'
-              : 'text-teal-600 hover:text-teal-700 underline'
+              : 'text-teal-600 hover:text-teal-700 underline cursor-pointer'
           }`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${resendLoading ? 'animate-spin' : ''}`} />
@@ -249,11 +232,11 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
       </div>
 
       {onCancel && (
-        <div className="text-center">
+        <div className="text-center pt-1">
           <button
             type="button"
             onClick={onCancel}
-            className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-xs text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
           >
             ← Kembali ke formulir pendaftaran
           </button>

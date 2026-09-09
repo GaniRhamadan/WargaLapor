@@ -118,6 +118,7 @@ export const RegisterPage: React.FC = () => {
       setStep('OTP');
     } catch (err: any) {
       setError(
+        err.message ||
         err.response?.data?.message ||
         err.response?.data?.errors?.email?.[0] ||
         err.response?.data?.errors?.phone?.[0] ||
