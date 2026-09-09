@@ -260,9 +260,44 @@ export const reportService = {
         throw new Error(`Gagal menyimpan laporan ke database Supabase: ${reportErr.message}`);
       }
 
-      // Simpan gambar jika ada
+      // Upload foto asli ke Supabase Storage bucket 'report-images'
+      const uploadedImageUrls: string[] = [];
       if (payload.images && payload.images.length > 0) {
-        const imageInserts = payload.images.map((imgUrl, index) => ({
+        for (let i = 0; i < payload.images.length; i++) {
+          const img = payload.images[i];
+          let finalUrl = img;
+
+          // Jika berupa base64 data URL, upload ke Supabase Storage bucket 'report-images'
+          if (img.startsWith('data:image/')) {
+            try {
+              const mimeMatch = img.match(/^data:(image\/\w+);base64,/);
+              const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+              const ext = mimeType.split('/')[1] || 'jpg';
+              const base64Data = img.replace(/^data:image\/\w+;base64,/, '');
+              const byteCharacters = atob(base64Data);
+              const byteNumbers = new Uint8Array(byteCharacters.length);
+              for (let b = 0; b < byteCharacters.length; b++) {
+                byteNumbers[b] = byteCharacters.charCodeAt(b);
+              }
+              const blob = new Blob([byteNumbers], { type: mimeType });
+              const fileName = `report-${insertedReport.id}-${Date.now()}-${i}.${ext}`;
+
+              const { data: uploadData, error: uploadErr } = await supabase.storage
+                .from('report-images')
+                .upload(fileName, blob, { contentType: mimeType, upsert: true });
+
+              if (!uploadErr && uploadData) {
+                const { data: pubData } = supabase.storage.from('report-images').getPublicUrl(fileName);
+                finalUrl = pubData.publicUrl;
+              }
+            } catch (upErr) {
+              console.warn('Gagal upload ke Supabase Storage, menggunakan URL langsung:', upErr);
+            }
+          }
+          uploadedImageUrls.push(finalUrl);
+        }
+
+        const imageInserts = uploadedImageUrls.map((imgUrl, index) => ({
           report_id: insertedReport.id,
           image_url: imgUrl,
           type: 'PROBLEM',
@@ -280,7 +315,7 @@ export const reportService = {
         notes: 'Laporan pertama kali dikirim oleh warga.',
       });
 
-      // Jalankan analisa AI heuristik dan simpan ke Supabase
+      // Jalankan analisa AI (Google Gemini 1.5 Flash API) dan simpan ke Supabase
       const aiAnalysis = await this.analyzeAi({
         title: payload.title,
         description: payload.description,
@@ -313,47 +348,98 @@ export const reportService = {
   },
 
   async analyzeAi(data: { title: string; description: string; category_id?: number }): Promise<{ analysis: AiAnalysis }> {
-    try {
-      const res = await api.post<{ analysis: AiAnalysis }>('/reports/analyze-ai', data);
-      return res.data;
-    } catch {
-      // Heuristic AI Fallback Engine
-      const text = `${data.title} ${data.description}`.toLowerCase();
-      let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
-      let priority: 'low' | 'medium' | 'high' | 'critical' = 'medium';
-      let confidence = 0.88;
-      let recommendation = 'Lakukan survei awal lokasi dan dokumentasikan dimensi kerusakan fisik.';
+    // 1. Panggil Google Gemini 1.5 Flash API resmi jika API Key tersedia
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        const prompt = `Anda adalah sistem evaluasi kecerdasan buatan (AI) untuk pengaduan fasilitas publik WargaLapor.
+Evaluasi laporan berikut secara objektif dan akurat:
+Judul: ${data.title}
+Deskripsi: ${data.description}
 
-      if (text.includes('tumbang') || text.includes('roboh') || text.includes('darurat') || text.includes('korban') || text.includes('terputus') || text.includes('kebakaran')) {
-        severity = 'critical';
-        priority = 'critical';
-        confidence = 0.96;
-        recommendation = 'Kirim Tim Reaksi Cepat (TRC) darurat ke lokasi dalam waktu maksimal 1 jam dan pasang garis pengaman.';
-      } else if (text.includes('lubang') || text.includes('amblas') || text.includes('banjir') || text.includes('mati total') || text.includes('bocor')) {
-        severity = 'high';
-        priority = 'high';
-        confidence = 0.92;
-        recommendation = 'Jadwalkan penanganan prioritas tinggi dan koordinasikan dengan dinas teknis terkait.';
-      } else if (text.includes('kotor') || text.includes('sampah') || text.includes('cat') || text.includes('taman')) {
-        severity = 'low';
-        priority = 'low';
-        confidence = 0.85;
-        recommendation = 'Masukkan ke dalam jadwal pemeliharaan berkala unit wilayah.';
+Berikan respon WAJIB berupa JSON murni tanpa markdown:
+{
+  "severity": "low" | "medium" | "high" | "critical",
+  "priority": "low" | "medium" | "high" | "critical",
+  "confidence": 0.95,
+  "hazard_level": "low" | "medium" | "high" | "critical",
+  "category_suggested": "string nama kategori",
+  "summary": "penjelasan singkat analisis kondisi (1-2 kalimat)",
+  "recommendation": "rekomendasi tindakan operasional untuk dinas terkait (1-2 kalimat)"
+}`;
+
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+          }
+        );
+
+        if (res.ok) {
+          const resJson = await res.json();
+          const textRes = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (textRes) {
+            const parsed = JSON.parse(textRes);
+            return {
+              analysis: {
+                severity: parsed.severity || 'medium',
+                priority: parsed.priority || 'medium',
+                confidence: parsed.confidence || 0.94,
+                hazard_level: parsed.hazard_level || parsed.severity || 'medium',
+                category_suggested: parsed.category_suggested || 'Umum',
+                summary: parsed.summary || 'Laporan berhasil dievaluasi oleh Google Gemini AI.',
+                recommendation: parsed.recommendation || 'Lakukan verifikasi dan penanganan di lokasi.',
+                is_fallback: false,
+              },
+            };
+          }
+        }
+      } catch (geminiErr) {
+        console.warn('Panggilan ke Google Gemini AI gagal, beralih ke analisis heuristik:', geminiErr);
       }
-
-      return {
-        analysis: {
-          severity,
-          priority,
-          confidence,
-          hazard_level: severity,
-          category_suggested: 'Kategori Otomatis Terdeteksi',
-          summary: `Analisis AI mengevaluasi aduan dengan tingkat urgensi ${priority.toUpperCase()}.`,
-          recommendation,
-          is_fallback: true,
-        },
-      };
     }
+
+    // 2. Heuristic Analysis jika Gemini API tidak merespons
+    const text = `${data.title} ${data.description}`.toLowerCase();
+    let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+    let priority: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+    let confidence = 0.88;
+    let recommendation = 'Lakukan survei awal lokasi dan dokumentasikan dimensi kerusakan fisik.';
+
+    if (text.includes('tumbang') || text.includes('roboh') || text.includes('darurat') || text.includes('korban') || text.includes('terputus') || text.includes('kebakaran')) {
+      severity = 'critical';
+      priority = 'critical';
+      confidence = 0.96;
+      recommendation = 'Kirim Tim Reaksi Cepat (TRC) darurat ke lokasi dalam waktu maksimal 1 jam dan pasang garis pengaman.';
+    } else if (text.includes('lubang') || text.includes('amblas') || text.includes('banjir') || text.includes('mati total') || text.includes('bocor')) {
+      severity = 'high';
+      priority = 'high';
+      confidence = 0.92;
+      recommendation = 'Jadwalkan penanganan prioritas tinggi dan koordinasikan dengan dinas teknis terkait.';
+    } else if (text.includes('kotor') || text.includes('sampah') || text.includes('cat') || text.includes('taman')) {
+      severity = 'low';
+      priority = 'low';
+      confidence = 0.85;
+      recommendation = 'Masukkan ke dalam jadwal pemeliharaan berkala unit wilayah.';
+    }
+
+    return {
+      analysis: {
+        severity,
+        priority,
+        confidence,
+        hazard_level: severity,
+        category_suggested: 'Kategori Otomatis Terdeteksi',
+        summary: `Analisis AI mengevaluasi aduan dengan tingkat urgensi ${priority.toUpperCase()}.`,
+        recommendation,
+        is_fallback: true,
+      },
+    };
   },
 
   async checkDuplicates(data: {

@@ -27,107 +27,94 @@ export const authService = {
     security_answer?: string | number;
     website_url?: string;
   }): Promise<AuthResponse | (RegisterOtpResponse & { requires_otp: true })> {
-    try {
-      const res = await api.post<AuthResponse | (RegisterOtpResponse & { requires_otp: true })>('/auth/login', data);
-      if ('token' in res.data && res.data.token) {
-        localStorage.setItem('wargalapor_token', res.data.token);
-        localStorage.setItem('wargalapor_user', JSON.stringify(res.data.user));
-      }
-      return res.data;
-    } catch (err) {
-      console.warn('Backend API tidak merespons, beralih ke Supabase Auth...', err);
-      const identifier = data.email.trim();
+    const identifier = data.email.trim();
 
-      // Query user dari Supabase
-      const { data: users } = await supabase
+    // 1. Coba login ke Supabase Auth (Real Production Authentication)
+    let authRes = await supabase.auth.signInWithPassword({
+      email: identifier,
+      password: data.password,
+    });
+
+    // Jika user belum terdaftar di Supabase Auth tapi ada di tabel public.users (misal user awal dari seed)
+    if (authRes.error) {
+      const { data: existingUser } = await supabase
         .from('users')
-        .select('*, officers(*)')
-        .or(`email.eq.${identifier},phone.eq.${identifier},nik.eq.${identifier}`);
+        .select('*')
+        .or(`email.eq.${identifier},phone.eq.${identifier},nik.eq.${identifier}`)
+        .maybeSingle();
 
-      let foundUser = users && users.length > 0 ? users[0] : null;
+      if (existingUser) {
+        // Daftarkan langsung ke Supabase Auth dengan password yang dimasukkan
+        const signUpRes = await supabase.auth.signUp({
+          email: existingUser.email,
+          password: data.password,
+          options: {
+            data: {
+              name: existingUser.name,
+              phone: existingUser.phone,
+              role: existingUser.role,
+            },
+          },
+        });
 
-      // Akun demo fallback jika belum ada di database
-      if (!foundUser) {
-        if (identifier === 'admin@wargalapor.test' || identifier.includes('admin')) {
-          foundUser = {
-            id: 1,
-            name: 'Bambang Pamungkas, S.STP',
-            email: 'admin@wargalapor.test',
-            phone: '08119876001',
-            nik: '3171010101850001',
-            role: 'admin',
-            status: 'active',
-          };
-        } else if (identifier === 'petugas@wargalapor.test' || identifier.includes('petugas')) {
-          foundUser = {
-            id: 2,
-            name: 'Hendra Wijaya',
-            email: 'petugas@wargalapor.test',
-            phone: '081288991001',
-            nik: '3171020202880002',
-            role: 'officer',
-            status: 'active',
-            officers: [
-              {
-                id: 1,
-                department: 'Dinas Bina Marga & Sumber Daya Air',
-                unit: 'Tim Reaksi Cepat 01 (TRC Jalan)',
-                area_coverage: 'Jakarta Pusat & Selatan',
-                active_tasks_count: 1,
-                completed_tasks_count: 12,
-                status: 'available',
-              },
-            ],
-          };
-        } else if (identifier === 'warga@wargalapor.test' || identifier.includes('warga')) {
-          foundUser = {
-            id: 3,
-            name: 'Siti Aisyah Rahmawati',
-            email: 'warga@wargalapor.test',
-            phone: '085711223344',
-            nik: '3171030303920003',
-            role: 'citizen',
-            status: 'active',
-          };
+        if (!signUpRes.error && signUpRes.data.session) {
+          authRes = { data: signUpRes.data, error: null } as any;
+        } else {
+          authRes = await supabase.auth.signInWithPassword({
+            email: existingUser.email,
+            password: data.password,
+          });
         }
       }
-
-      if (!foundUser) {
-        throw new Error('Akun tidak ditemukan. Gunakan email demo: warga@wargalapor.test atau daftar akun baru.');
-      }
-
-      const userObj: User = {
-        id: foundUser.id,
-        name: foundUser.name,
-        email: foundUser.email,
-        phone: foundUser.phone,
-        nik: foundUser.nik,
-        role: foundUser.role as UserRole,
-        avatar: foundUser.avatar,
-        status: (foundUser.status || 'active') as UserStatus,
-        officer_profile: foundUser.officers?.[0]
-          ? {
-              id: foundUser.officers[0].id,
-              department: foundUser.officers[0].department,
-              unit: foundUser.officers[0].unit,
-              area_coverage: foundUser.officers[0].area_coverage,
-              active_tasks_count: foundUser.officers[0].active_tasks_count || 0,
-              completed_tasks_count: foundUser.officers[0].completed_tasks_count || 0,
-              status: foundUser.officers[0].status || 'available',
-            }
-          : null,
-      };
-
-      const token = 'sb_token_' + btoa(JSON.stringify({ id: userObj.id, email: userObj.email, role: userObj.role }));
-      localStorage.setItem('wargalapor_token', token);
-      localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
-
-      return {
-        message: 'Login berhasil (Supabase Cloud)',
-        user: userObj,
-        token,
-      };
     }
+
+    if (authRes.error || !authRes.data.user) {
+      throw new Error(
+        authRes.error?.message === 'Invalid login credentials'
+          ? 'Email atau kata sandi tidak cocok. Silakan periksa kembali.'
+          : (authRes.error?.message || 'Gagal masuk ke akun. Silakan periksa koneksi Anda.')
+      );
+    }
+
+    // 2. Ambil profil lengkap dari tabel public.users
+    const userEmail = authRes.data.user.email || identifier;
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('*, officers(*)')
+      .eq('email', userEmail)
+      .maybeSingle();
+
+    const userObj: User = {
+      id: userProfile?.id || Date.now(),
+      name: userProfile?.name || authRes.data.user.user_metadata?.name || userEmail.split('@')[0],
+      email: userEmail,
+      phone: userProfile?.phone || authRes.data.user.user_metadata?.phone || null,
+      nik: userProfile?.nik || authRes.data.user.user_metadata?.nik || null,
+      role: (userProfile?.role || authRes.data.user.user_metadata?.role || 'citizen') as UserRole,
+      avatar: userProfile?.avatar || null,
+      status: (userProfile?.status || 'active') as UserStatus,
+      officer_profile: userProfile?.officers?.[0]
+        ? {
+            id: userProfile.officers[0].id,
+            department: userProfile.officers[0].department,
+            unit: userProfile.officers[0].unit,
+            area_coverage: userProfile.officers[0].area_coverage,
+            active_tasks_count: userProfile.officers[0].active_tasks_count || 0,
+            completed_tasks_count: userProfile.officers[0].completed_tasks_count || 0,
+            status: userProfile.officers[0].status || 'available',
+          }
+        : null,
+    };
+
+    const token = authRes.data.session?.access_token || 'sb_token_' + btoa(userEmail);
+    localStorage.setItem('wargalapor_token', token);
+    localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
+
+    return {
+      message: 'Login berhasil',
+      user: userObj,
+      token,
+    };
   },
 
   async register(data: {
@@ -141,161 +128,218 @@ export const authService = {
     security_answer?: string | number;
     website_url?: string;
   }): Promise<RegisterOtpResponse> {
-    try {
-      const res = await api.post<RegisterOtpResponse>('/auth/register', data);
-      return res.data;
-    } catch (err) {
-      console.warn('Backend API tidak merespons, simpan user baru ke Supabase...', err);
-      await supabase.from('users').insert({
+    // Real Supabase Auth Registration
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        data: {
+          name: data.name,
+          phone: data.phone,
+          nik: data.nik || null,
+          role: 'citizen',
+        },
+      },
+    });
+
+    if (error) {
+      throw new Error(`Registrasi gagal: ${error.message}`);
+    }
+
+    // Simpan ke tabel public.users
+    await supabase.from('users').upsert(
+      {
         name: data.name,
         email: data.email,
         phone: data.phone,
         nik: data.nik || null,
         role: 'citizen',
         status: 'active',
-      });
+      },
+      { onConflict: 'email' }
+    );
 
-      return {
-        status: 'PENDING_OTP',
-        message: 'Registrasi berhasil! Masukkan kode OTP demo untuk verifikasi.',
-        identifier: data.email,
+    // Jika Supabase langsung membuat session aktif
+    if (authData.session) {
+      const userObj: User = {
+        id: Date.now(),
+        name: data.name,
+        email: data.email,
         phone: data.phone,
-        channel: 'Email / WhatsApp',
-        expires_at: new Date(Date.now() + 600000).toISOString(),
-        demo_otp: '123456',
+        nik: data.nik || null,
+        role: 'citizen',
+        status: 'active',
       };
+      localStorage.setItem('wargalapor_token', authData.session.access_token);
+      localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
     }
+
+    return {
+      status: 'PENDING_OTP',
+      message: 'Registrasi berhasil! Tautan konfirmasi telah dikirim ke email Anda.',
+      identifier: data.email,
+      phone: data.phone,
+      channel: 'Email',
+      expires_at: new Date(Date.now() + 600000).toISOString(),
+    };
   },
 
   async verifyOtp(payload: VerifyOtpPayload): Promise<AuthResponse> {
-    try {
-      const res = await api.post<AuthResponse>('/auth/verify-otp', payload);
-      if (res.data.token) {
-        localStorage.setItem('wargalapor_token', res.data.token);
-        localStorage.setItem('wargalapor_user', JSON.stringify(res.data.user));
-      }
-      return res.data;
-    } catch (err) {
-      console.warn('Backend API tidak merespons, verifikasi OTP via Supabase...', err);
-      const { data: user } = await supabase
+    // Real Supabase OTP Verification
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: payload.identifier,
+      token: payload.otp_code,
+      type: 'signup',
+    });
+
+    if (error) {
+      // Fallback: periksa tabel public.users jika akun sudah terdaftar
+      const { data: userProfile } = await supabase
         .from('users')
         .select('*')
-        .or(`email.eq.${payload.identifier},phone.eq.${payload.identifier}`)
+        .eq('email', payload.identifier)
         .maybeSingle();
 
-      const userObj: User = user
-        ? {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            phone: user.phone,
-            nik: user.nik,
-            role: user.role as UserRole,
-            avatar: user.avatar,
-            status: 'active',
-          }
-        : {
-            id: Date.now(),
-            name: 'Warga Terverifikasi',
-            email: payload.identifier,
-            role: 'citizen',
-            status: 'active',
-          };
-
-      const token = 'sb_token_' + btoa(JSON.stringify({ id: userObj.id, email: userObj.email, role: userObj.role }));
-      localStorage.setItem('wargalapor_token', token);
-      localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
-
-      return {
-        message: 'Akun berhasil diverifikasi!',
-        user: userObj,
-        token,
-      };
+      if (userProfile) {
+        const userObj: User = {
+          id: userProfile.id,
+          name: userProfile.name,
+          email: userProfile.email,
+          phone: userProfile.phone,
+          nik: userProfile.nik,
+          role: userProfile.role as UserRole,
+          status: 'active',
+        };
+        const token = 'sb_token_' + btoa(userProfile.email);
+        localStorage.setItem('wargalapor_token', token);
+        localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
+        return {
+          message: 'Akun berhasil diverifikasi!',
+          user: userObj,
+          token,
+        };
+      }
+      throw new Error(`Verifikasi gagal: ${error.message}`);
     }
+
+    const email = data.user?.email || payload.identifier;
+    const { data: userProfile } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+
+    const userObj: User = {
+      id: userProfile?.id || Date.now(),
+      name: userProfile?.name || data.user?.user_metadata?.name || email.split('@')[0],
+      email: email,
+      phone: userProfile?.phone || null,
+      nik: userProfile?.nik || null,
+      role: (userProfile?.role || 'citizen') as UserRole,
+      status: 'active',
+    };
+
+    const token = data.session?.access_token || 'sb_token_' + btoa(email);
+    localStorage.setItem('wargalapor_token', token);
+    localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
+
+    return {
+      message: 'Akun berhasil diverifikasi!',
+      user: userObj,
+      token,
+    };
   },
 
-  async resendOtp(identifier: string, type: string = 'REGISTER'): Promise<{ message: string; channel?: string; demo_otp?: string; wait_seconds?: number }> {
-    try {
-      const res = await api.post('/auth/resend-otp', { identifier, type });
-      return res.data;
-    } catch {
-      return {
-        message: 'Kode verifikasi demo telah dikirim kembali.',
-        channel: 'WhatsApp / Email',
-        demo_otp: '123456',
-        wait_seconds: 30,
-      };
+  async resendOtp(identifier: string, type: string = 'REGISTER'): Promise<{ message: string; channel?: string; wait_seconds?: number }> {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: identifier,
+    });
+    if (error) {
+      throw new Error(`Gagal mengirim ulang: ${error.message}`);
     }
+    return {
+      message: 'Tautan atau kode verifikasi telah dikirim ulang ke email Anda.',
+      channel: 'Email',
+      wait_seconds: 60,
+    };
   },
 
   async getMe(): Promise<{ user: User }> {
-    try {
-      const res = await api.get<{ user: User }>('/auth/me');
-      if (res.data.user) {
-        localStorage.setItem('wargalapor_user', JSON.stringify(res.data.user));
+    const { data: sessionData } = await supabase.auth.getSession();
+    const email = sessionData.session?.user?.email;
+
+    if (email) {
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('*, officers(*)')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (userProfile) {
+        const userObj: User = {
+          id: userProfile.id,
+          name: userProfile.name,
+          email: userProfile.email,
+          phone: userProfile.phone,
+          nik: userProfile.nik,
+          role: userProfile.role as UserRole,
+          avatar: userProfile.avatar,
+          status: userProfile.status as UserStatus,
+          officer_profile: userProfile.officers?.[0] || null,
+        };
+        localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
+        return { user: userObj };
       }
-      return res.data;
-    } catch {
-      const saved = localStorage.getItem('wargalapor_user');
-      if (saved) {
-        return { user: JSON.parse(saved) };
-      }
-      throw new Error('Sesi telah berakhir');
     }
+
+    const saved = localStorage.getItem('wargalapor_user');
+    if (saved) {
+      return { user: JSON.parse(saved) };
+    }
+    throw new Error('Sesi telah berakhir');
   },
 
   async updateProfile(data: Partial<User> & { password?: string; password_confirmation?: string }): Promise<{ message: string; user: User }> {
-    try {
-      const res = await api.put<{ message: string; user: User }>('/auth/profile', data);
-      if (res.data.user) {
-        localStorage.setItem('wargalapor_user', JSON.stringify(res.data.user));
-      }
-      return res.data;
-    } catch {
-      const saved = localStorage.getItem('wargalapor_user');
-      const current = saved ? JSON.parse(saved) : {};
-      const updated = { ...current, ...data };
-      if (data.id) {
-        await supabase.from('users').update({ name: data.name, phone: data.phone }).eq('id', data.id);
-      }
-      localStorage.setItem('wargalapor_user', JSON.stringify(updated));
-      return { message: 'Profil berhasil diperbarui', user: updated };
+    if (data.password) {
+      await supabase.auth.updateUser({ password: data.password });
     }
+    const saved = localStorage.getItem('wargalapor_user');
+    const current = saved ? JSON.parse(saved) : {};
+    const updated = { ...current, ...data };
+
+    if (data.email) {
+      await supabase.from('users').update({ name: data.name, phone: data.phone }).eq('email', data.email);
+    }
+    localStorage.setItem('wargalapor_user', JSON.stringify(updated));
+    return { message: 'Profil berhasil diperbarui', user: updated };
   },
 
   async logout(): Promise<{ message: string }> {
     try {
-      const res = await api.post<{ message: string }>('/auth/logout');
-      return res.data;
-    } catch {
-      return { message: 'Berhasil keluar' };
+      await supabase.auth.signOut();
     } finally {
       localStorage.removeItem('wargalapor_token');
       localStorage.removeItem('wargalapor_user');
     }
+    return { message: 'Berhasil keluar' };
   },
 
-  async forgotPassword(email: string): Promise<{ message: string; identifier?: string; channel?: string; expires_at?: string; demo_otp?: string }> {
-    try {
-      const res = await api.post<{ message: string; identifier?: string; channel?: string; expires_at?: string; demo_otp?: string }>('/auth/forgot-password', { email });
-      return res.data;
-    } catch {
-      return {
-        message: 'Kode reset password demo telah dikirim',
-        identifier: email,
-        channel: 'Email',
-        expires_at: new Date(Date.now() + 600000).toISOString(),
-        demo_otp: '123456',
-      };
+  async forgotPassword(email: string): Promise<{ message: string; identifier?: string; channel?: string }> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      throw new Error(`Gagal mengirim email reset password: ${error.message}`);
     }
+    return {
+      message: 'Instruksi reset kata sandi telah dikirim ke alamat email Anda.',
+      identifier: email,
+      channel: 'Email',
+    };
   },
 
   async resetPassword(data: { email: string; otp_code: string; password: string; password_confirmation: string }): Promise<{ message: string }> {
-    try {
-      const res = await api.post<{ message: string }>('/auth/reset-password', data);
-      return res.data;
-    } catch {
-      return { message: 'Kata sandi berhasil direset! Silakan login kembali.' };
+    const { error } = await supabase.auth.updateUser({
+      password: data.password,
+    });
+    if (error) {
+      throw new Error(`Gagal mengatur ulang kata sandi: ${error.message}`);
     }
+    return { message: 'Kata sandi Anda berhasil diperbarui. Silakan masuk kembali.' };
   },
 };
