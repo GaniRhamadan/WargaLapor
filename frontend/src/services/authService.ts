@@ -35,6 +35,10 @@ export const authService = {
     security_answer?: string | number;
     website_url?: string;
   }): Promise<AuthResponse | (RegisterOtpResponse & { requires_otp: true })> {
+    const rawInput = data.email.trim();
+    const cleanEmail = rawInput.toLowerCase();
+
+    // 1. Coba login ke API Backend Laravel resmi (Localhost / Full-Stack / Cloudflare Tunnel)
     try {
       const res = await api.post<AuthResponse | (RegisterOtpResponse & { requires_otp: true })>(
         '/auth/login',
@@ -54,12 +58,140 @@ export const authService = {
 
       return res.data;
     } catch (err: any) {
-      const msg =
-        err.response?.data?.message ||
-        err.response?.data?.errors?.email?.[0] ||
-        err.message ||
-        'Gagal masuk ke akun. Periksa kembali email/kata sandi Anda.';
-      throw new Error(msg);
+      // Jika error 422 atau 401 dari backend Laravel yang aktif, lemparkan pesan validasi asli
+      if (err.response?.status === 422 || (err.response?.status === 401 && !err.isHtmlRewrite)) {
+        const msg =
+          err.response?.data?.message ||
+          err.response?.data?.errors?.email?.[0] ||
+          'Email atau kata sandi tidak valid.';
+        throw new Error(msg);
+      }
+
+      // 2. Jika backend offline, 404, atau 405 (Host Static Vercel yang tidak menjalankan PHP Laravel)
+      console.warn('Backend Laravel offline / 405 di Vercel, mengaktifkan Fallback Akun Demo & Supabase...');
+
+      // A. Kredensial Akun Demo Cepat (Ready to use di Vercel)
+      const DEMO_CREDENTIALS: Record<string, User> = {
+        'admin@wargalapor.test': {
+          id: 1,
+          name: 'Administrator Kota',
+          email: 'admin@wargalapor.test',
+          phone: '081122334455',
+          nik: '3171010000000001',
+          role: 'admin',
+          status: 'active',
+        },
+        'petugas@wargalapor.test': {
+          id: 2,
+          name: 'Budi Santoso (TRC)',
+          email: 'petugas@wargalapor.test',
+          phone: '081234567891',
+          nik: '3171010000000002',
+          role: 'officer',
+          status: 'active',
+          officer_profile: {
+            id: 1,
+            department: 'Dinas Bina Marga',
+            unit: 'Tim Reaksi Cepat',
+            area_coverage: 'Jakarta Pusat',
+            active_tasks_count: 3,
+            completed_tasks_count: 24,
+            status: 'available',
+          },
+        },
+        'petugas2@wargalapor.test': {
+          id: 4,
+          name: 'Siti Rahma (DLH)',
+          email: 'petugas2@wargalapor.test',
+          phone: '081234567892',
+          nik: '3171010000000004',
+          role: 'officer',
+          status: 'active',
+          officer_profile: {
+            id: 2,
+            department: 'Dinas Lingkungan Hidup',
+            unit: 'Satgas Kebersihan',
+            area_coverage: 'Jakarta Selatan',
+            active_tasks_count: 2,
+            completed_tasks_count: 18,
+            status: 'available',
+          },
+        },
+        'warga@wargalapor.test': {
+          id: 3,
+          name: 'Ahmad Syarif',
+          email: 'warga@wargalapor.test',
+          phone: '081234567890',
+          nik: '3171012345678901',
+          role: 'citizen',
+          status: 'active',
+        },
+      };
+
+      const matchedDemoKey = Object.keys(DEMO_CREDENTIALS).find(
+        (key) => key === cleanEmail || DEMO_CREDENTIALS[key].nik === rawInput
+      );
+
+      if (matchedDemoKey) {
+        if (data.password === 'password') {
+          const demoUser = DEMO_CREDENTIALS[matchedDemoKey];
+          const token = 'demo_token_' + btoa(demoUser.email);
+          localStorage.setItem('wargalapor_token', token);
+          localStorage.setItem('wargalapor_user', JSON.stringify(demoUser));
+          return {
+            message: 'Berhasil masuk (Mode Cloud Demo)',
+            user: demoUser,
+            token,
+          };
+        } else {
+          throw new Error('Kata sandi salah. Untuk akun demo, gunakan kata sandi: password');
+        }
+      }
+
+      // B. Coba login via Supabase Auth untuk akun umum
+      try {
+        const authRes = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: data.password,
+        });
+
+        if (!authRes.error && authRes.data.user) {
+          const email = authRes.data.user.email || cleanEmail;
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('*, officers(*)')
+            .eq('email', email)
+            .maybeSingle();
+
+          const userObj: User = {
+            id: userProfile?.id || Date.now(),
+            name: userProfile?.name || authRes.data.user.user_metadata?.name || email.split('@')[0],
+            email: email,
+            phone: userProfile?.phone || null,
+            nik: userProfile?.nik || null,
+            role: (userProfile?.role || 'citizen') as UserRole,
+            avatar: userProfile?.avatar,
+            status: (userProfile?.status || 'active') as UserStatus,
+            officer_profile: userProfile?.officers?.[0] || null,
+          };
+
+          const token = authRes.data.session?.access_token || 'sb_token_' + btoa(email);
+          localStorage.setItem('wargalapor_token', token);
+          localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
+
+          return {
+            message: 'Berhasil masuk via Supabase',
+            user: userObj,
+            token,
+          };
+        }
+      } catch (sbErr) {
+        console.warn('Supabase auth login skipped:', sbErr);
+      }
+
+      throw new Error(
+        'Gagal masuk. Periksa kembali email dan kata sandi Anda. Anda dapat mencoba akun demo: admin@wargalapor.test (kata sandi: password).'
+      );
     }
   },
 
