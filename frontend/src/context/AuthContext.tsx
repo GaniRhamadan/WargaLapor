@@ -44,18 +44,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refreshUser = async () => {
-    if (!localStorage.getItem('wargalapor_token')) {
+    const savedToken = localStorage.getItem('wargalapor_token');
+    const savedUserStr = localStorage.getItem('wargalapor_user');
+    if (!savedToken && !savedUserStr) {
       setIsLoading(false);
       return;
     }
     try {
       const res = await authService.getMe();
-      setUser(res.user);
+      if (res?.user) {
+        setUser(res.user);
+      }
     } catch {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('wargalapor_token');
-      localStorage.removeItem('wargalapor_user');
+      // If network is offline or backend API is unreachable on Vercel, preserve saved session
+      if (savedUserStr) {
+        try {
+          setUser(JSON.parse(savedUserStr));
+        } catch {
+          setUser(null);
+          setToken(null);
+          localStorage.removeItem('wargalapor_token');
+          localStorage.removeItem('wargalapor_user');
+        }
+      }
     } finally {
       setIsLoading(false);
     }

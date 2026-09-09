@@ -183,15 +183,51 @@ export const authService = {
   async getMe(): Promise<{ user: User }> {
     try {
       const res = await api.get<{ user: User }>('/auth/me');
-      if (res.data.user) {
+      if (res.data?.user) {
         localStorage.setItem('wargalapor_user', JSON.stringify(res.data.user));
+        return res.data;
       }
-      return res.data;
-    } catch (err: any) {
-      localStorage.removeItem('wargalapor_token');
-      localStorage.removeItem('wargalapor_user');
-      throw new Error('Sesi telah berakhir atau tidak valid.');
+    } catch {
+      // Backend not reached or offline: check Supabase session
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const email = sessionData?.session?.user?.email;
+        if (email) {
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('*, officers(*)')
+            .eq('email', email)
+            .maybeSingle();
+
+          if (userProfile) {
+            const userObj: User = {
+              id: userProfile.id,
+              name: userProfile.name,
+              email: userProfile.email,
+              phone: userProfile.phone,
+              nik: userProfile.nik,
+              role: userProfile.role as UserRole,
+              avatar: userProfile.avatar,
+              status: userProfile.status as UserStatus,
+              officer_profile: userProfile.officers?.[0] || null,
+            };
+            localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
+            return { user: userObj };
+          }
+        }
+      } catch (sbErr) {
+        console.warn('Supabase getMe skipped:', sbErr);
+      }
+
+      // Fallback to locally saved user in localStorage
+      const saved = localStorage.getItem('wargalapor_user');
+      if (saved) {
+        try {
+          return { user: JSON.parse(saved) };
+        } catch {}
+      }
     }
+    throw new Error('Sesi telah berakhir atau tidak valid.');
   },
 
   async updateProfile(

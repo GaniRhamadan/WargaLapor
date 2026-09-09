@@ -43,9 +43,19 @@ export const AdminDashboard: React.FC = () => {
       analyticsService.getAdminAnalytics(30),
     ])
       .then(([resReports, resAnalytics]) => {
-        setStats(resReports.stats);
-        setPendingReports(resReports.reports.data);
-        setAnalytics(resAnalytics);
+        if (resReports?.stats) {
+          setStats(resReports.stats);
+        }
+        const pending = Array.isArray(resReports?.reports?.data)
+          ? resReports.reports.data
+          : Array.isArray(resReports?.reports)
+            ? resReports.reports
+            : [];
+        setPendingReports(pending);
+        setAnalytics(resAnalytics || null);
+      })
+      .catch((err) => {
+        console.error('Error fetching admin dashboard data:', err);
       })
       .finally(() => setLoading(false));
   }, []);

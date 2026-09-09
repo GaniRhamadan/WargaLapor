@@ -45,19 +45,24 @@ export const LandingPage: React.FC = () => {
 
   useEffect(() => {
     analyticsService.getPublicStats().then((data) => {
-      setStats((prev) => ({ ...prev, ...data }));
+      if (data && typeof data === 'object') {
+        setStats((prev) => ({ ...prev, ...data }));
+      }
     }).catch(() => {});
 
     reportService.getCategories().then((data) => {
-      setCategories(data.categories.slice(0, 8));
+      const cats = Array.isArray(data?.categories) ? data.categories : [];
+      setCategories(cats.slice(0, 8));
     }).catch(() => {});
 
     reportService.getReports({ scope: 'public', per_page: 3 }).then((data) => {
-      setRecentReports(data.data);
+      const reps = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      setRecentReports(reps);
     }).catch(() => {});
 
     mapService.getMapReports().then((data) => {
-      setMapReports(data.reports.slice(0, 15));
+      const mapReps = Array.isArray(data?.reports) ? data.reports : (Array.isArray(data) ? data : []);
+      setMapReports(mapReps.slice(0, 15));
     }).catch(() => {});
   }, []);
 

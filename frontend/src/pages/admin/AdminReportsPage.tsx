@@ -80,13 +80,30 @@ export const AdminReportsPage: React.FC = () => {
         category_id: categoryId ? Number(categoryId) : undefined,
         search: search || undefined,
       })
-      .then((res) => setReports(res.reports.data))
+      .then((res) => {
+        const reps = Array.isArray(res?.reports?.data)
+          ? res.reports.data
+          : Array.isArray(res?.reports)
+            ? res.reports
+            : [];
+        setReports(reps);
+      })
+      .catch((err) => {
+        console.error('Error fetching admin reports:', err);
+        setReports([]);
+      })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    reportService.getCategories().then((res) => setCategories(res.categories));
-    adminService.getOfficers().then((res) => setOfficers(res.officers));
+    reportService
+      .getCategories()
+      .then((res) => setCategories(Array.isArray(res?.categories) ? res.categories : []))
+      .catch(() => setCategories([]));
+    adminService
+      .getOfficers()
+      .then((res) => setOfficers(Array.isArray(res?.officers) ? res.officers : []))
+      .catch(() => setOfficers([]));
   }, []);
 
   useEffect(() => {

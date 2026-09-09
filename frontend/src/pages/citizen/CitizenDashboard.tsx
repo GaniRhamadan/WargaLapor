@@ -29,21 +29,41 @@ export const CitizenDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     Promise.all([
       reportService.getReports({ scope: 'my', per_page: 4 }),
       mapService.getMapReports(),
     ])
       .then(([resMy, resMap]) => {
-        setMyReports(resMy.data);
-        setNearbyReports(resMap.reports.slice(0, 10));
+        if (!isMounted) return;
+        const myData = Array.isArray(resMy?.data) ? resMy.data : (Array.isArray(resMy) ? resMy : []);
+        const nearbyData = Array.isArray(resMap?.reports) ? resMap.reports : (Array.isArray(resMap) ? resMap : []);
+        setMyReports(myData);
+        setNearbyReports(nearbyData.slice(0, 10));
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        console.error('Error loading citizen dashboard data:', err);
+        if (isMounted) {
+          setMyReports([]);
+          setNearbyReports([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const totalMy = myReports.length;
-  const pendingMy = myReports.filter((r) => r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW').length;
-  const inProgressMy = myReports.filter((r) => r.status === 'ASSIGNED' || r.status === 'IN_PROGRESS' || r.status === 'WAITING').length;
-  const resolvedMy = myReports.filter((r) => r.status === 'RESOLVED' || r.status === 'CLOSED').length;
+  const safeMyReports = Array.isArray(myReports) ? myReports : [];
+  const safeNearbyReports = Array.isArray(nearbyReports) ? nearbyReports : [];
+
+  const totalMy = safeMyReports.length;
+  const pendingMy = safeMyReports.filter((r) => r && (r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW')).length;
+  const inProgressMy = safeMyReports.filter((r) => r && (r.status === 'ASSIGNED' || r.status === 'IN_PROGRESS' || r.status === 'WAITING')).length;
+  const resolvedMy = safeMyReports.filter((r) => r && (r.status === 'RESOLVED' || r.status === 'CLOSED')).length;
 
   return (
     <div className="space-y-8">
@@ -120,7 +140,7 @@ export const CitizenDashboard: React.FC = () => {
           </Link>
         </div>
 
-        {myReports.length === 0 ? (
+        {safeMyReports.length === 0 ? (
           <Card className="text-center py-10 space-y-3">
             <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center mx-auto">
               <FileText className="w-6 h-6" />
@@ -137,7 +157,7 @@ export const CitizenDashboard: React.FC = () => {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {myReports.slice(0, 3).map((rep) => (
+            {safeMyReports.slice(0, 3).map((rep) => (
               <ReportCard key={rep.id} report={rep} detailUrl={`/citizen/reports/${rep.id}`} />
             ))}
           </div>
@@ -156,7 +176,7 @@ export const CitizenDashboard: React.FC = () => {
           </Link>
         </div>
 
-        <ReportMap reports={nearbyReports} height="380px" />
+        <ReportMap reports={safeNearbyReports} height="380px" />
       </div>
     </div>
   );

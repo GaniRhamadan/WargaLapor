@@ -29,8 +29,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       setIsLoading(true);
       const res = await notificationService.getNotifications(1);
-      setNotifications(res.notifications.data);
-      setUnreadCount(res.unread_count);
+      const notifs = Array.isArray(res?.notifications?.data)
+        ? res.notifications.data
+        : Array.isArray((res as any)?.notifications)
+          ? (res as any).notifications
+          : [];
+      setNotifications(notifs);
+      setUnreadCount(typeof res?.unread_count === 'number' ? res.unread_count : 0);
     } catch {
       // ignore
     } finally {

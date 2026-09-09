@@ -23,7 +23,14 @@ export const MyReportsPage: React.FC = () => {
         status: statusFilter || undefined,
         search: search || undefined,
       })
-      .then((res) => setReports(res.data))
+      .then((res) => {
+        const reps = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+        setReports(reps);
+      })
+      .catch((err) => {
+        console.error('Error fetching my reports:', err);
+        setReports([]);
+      })
       .finally(() => setLoading(false));
   };
 

@@ -38,7 +38,18 @@ export const AdminVerificationPage: React.FC = () => {
     setLoading(true);
     adminService
       .getReports({ verification_status: 'PENDING' })
-      .then((res) => setReports(res.reports.data))
+      .then((res) => {
+        const reps = Array.isArray(res?.reports?.data)
+          ? res.reports.data
+          : Array.isArray(res?.reports)
+            ? res.reports
+            : [];
+        setReports(reps);
+      })
+      .catch((err) => {
+        console.error('Error fetching pending reports:', err);
+        setReports([]);
+      })
       .finally(() => setLoading(false));
   };
 

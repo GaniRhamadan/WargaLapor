@@ -34,13 +34,23 @@ export const OfficerDashboard: React.FC = () => {
     officerService
       .getTasks()
       .then((res) => {
-        setTasks(res.tasks.data);
-        setStats(res.stats);
+        const taskList = Array.isArray(res?.tasks?.data)
+          ? res.tasks.data
+          : Array.isArray(res?.tasks)
+            ? res.tasks
+            : [];
+        setTasks(taskList);
+        if (res?.stats) setStats(res.stats);
+      })
+      .catch((err) => {
+        console.error('Failed to get officer tasks:', err);
+        setTasks([]);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const urgentTasks = tasks.filter(
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const urgentTasks = safeTasks.filter(
     (t) => (t.priority === 'CRITICAL' || t.priority === 'HIGH') && t.status !== 'RESOLVED' && t.status !== 'CLOSED'
   );
 

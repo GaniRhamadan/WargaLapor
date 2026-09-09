@@ -60,6 +60,20 @@ export const ReportMap: React.FC<ReportMapProps> = ({
   onMarkerClick,
   showLinkToDetail = true,
 }) => {
+  // Ensure safe reports array and valid coordinates
+  const validReports = Array.isArray(reports)
+    ? reports.filter(
+        (r) =>
+          r &&
+          r.latitude != null &&
+          r.longitude != null &&
+          !isNaN(Number(r.latitude)) &&
+          !isNaN(Number(r.longitude)) &&
+          Number(r.latitude) !== 0 &&
+          Number(r.longitude) !== 0
+      )
+    : [];
+
   return (
     <div style={{ height }} className="w-full rounded-2xl overflow-hidden shadow-xs border border-slate-200 relative z-0">
       <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="w-full h-full">
@@ -69,7 +83,7 @@ export const ReportMap: React.FC<ReportMapProps> = ({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {reports.map((report) => {
+        {validReports.map((report) => {
           const isCrit = report.priority === 'CRITICAL';
           const markerColor = report.category?.color || (isCrit ? '#DC2626' : '#0D9488');
           const icon = createCustomIcon(markerColor, isCrit);
@@ -77,7 +91,7 @@ export const ReportMap: React.FC<ReportMapProps> = ({
           return (
             <Marker
               key={report.id}
-              position={[report.latitude, report.longitude]}
+              position={[Number(report.latitude), Number(report.longitude)]}
               icon={icon}
               eventHandlers={{
                 click: () => onMarkerClick && onMarkerClick(report),
