@@ -56,7 +56,7 @@ export const CitizenDashboard: React.FC = () => {
               <span>Portal Pelayanan Warga Cerdas</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Halo, {user?.name || 'Warga'}! 👋
+              Halo, {user?.name || 'Warga'}!
             </h1>
             <p className="text-xs sm:text-sm text-teal-100 max-w-xl leading-relaxed">
               Ada fasilitas umum yang rusak, jalan berlubang, atau sampah liar di sekitar Anda? Laporkan sekarang agar segera ditangani dinas terkait.

@@ -55,7 +55,7 @@ export const OfficerDashboard: React.FC = () => {
               <span>{user?.officer_profile?.department || 'Satuan Tugas Lapangan'}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Selamat Bertugas, {user?.name}! 👷
+              Selamat Bertugas, {user?.name}!
             </h1>
             <p className="text-xs sm:text-sm text-amber-100 max-w-xl">
               Unit: {user?.officer_profile?.unit || 'Tim Reaksi Cepat'} • Wilayah:{' '}

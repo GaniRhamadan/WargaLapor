@@ -308,7 +308,7 @@ export const CreateReportPage: React.FC = () => {
         </div>
         <div className="space-y-2">
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-            Laporan Berhasil Terkirim! 🎉
+            Laporan Berhasil Terkirim!
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
             Laporan Anda telah tercatat dalam sistem WargaLapor dan sedang dalam antrean verifikasi petugas dinas terkait.
@@ -787,7 +787,7 @@ export const CreateReportPage: React.FC = () => {
 
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-3">
             <p className="text-xs font-bold text-slate-800">
-              🚀 Opsi Cepat: Masuk Akun Warga Aktif
+              Opsi Cepat: Masuk Akun Warga Aktif
             </p>
             <Button
               type="button"
