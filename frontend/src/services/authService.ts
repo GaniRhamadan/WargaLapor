@@ -38,92 +38,117 @@ export const authService = {
     const rawInput = data.email.trim();
     const cleanEmail = rawInput.toLowerCase();
 
-    // Kredensial Akun Demo Resmi WargaLapor (Langsung aktif di Vercel & Offline)
-    const DEMO_CREDENTIALS: Record<string, User> = {
-      'admin@wargalapor.test': {
-        id: 1,
-        name: 'Administrator Kota',
-        email: 'admin@wargalapor.test',
-        phone: '081122334455',
-        nik: '3171010000000001',
-        role: 'admin',
-        status: 'active',
-      },
-      'petugas@wargalapor.test': {
-        id: 2,
-        name: 'Budi Santoso (TRC)',
-        email: 'petugas@wargalapor.test',
-        phone: '081234567891',
-        nik: '3171010000000002',
-        role: 'officer',
-        status: 'active',
-        officer_profile: {
-          id: 1,
-          department: 'Dinas Bina Marga',
-          unit: 'Tim Reaksi Cepat',
-          area_coverage: 'Jakarta Pusat',
-          active_tasks_count: 3,
-          completed_tasks_count: 24,
-          status: 'available',
-        },
-      },
-      'petugas2@wargalapor.test': {
-        id: 4,
-        name: 'Siti Rahma (DLH)',
-        email: 'petugas2@wargalapor.test',
-        phone: '081234567892',
-        nik: '3171010000000004',
-        role: 'officer',
-        status: 'active',
-        officer_profile: {
-          id: 2,
-          department: 'Dinas Lingkungan Hidup',
-          unit: 'Satgas Kebersihan',
-          area_coverage: 'Jakarta Selatan',
-          active_tasks_count: 2,
-          completed_tasks_count: 18,
-          status: 'available',
-        },
-      },
-      'warga@wargalapor.test': {
-        id: 3,
-        name: 'Ahmad Syarif',
-        email: 'warga@wargalapor.test',
-        phone: '081234567890',
-        nik: '3171012345678901',
-        role: 'citizen',
-        status: 'active',
-      },
-    };
+    // 1. Coba login ke API Backend Laravel resmi (Localhost / Full-Stack / Cloudflare Tunnel)
+    try {
+      const res = await api.post<AuthResponse | (RegisterOtpResponse & { requires_otp: true })>(
+        '/auth/login',
+        data
+      );
 
-    const isVercel =
-      typeof window !== 'undefined' &&
-      (window.location.hostname.includes('vercel.app') ||
-        window.location.hostname.includes('warga-lapor'));
-
-    const matchedDemoKey = Object.keys(DEMO_CREDENTIALS).find(
-      (key) => key === cleanEmail || DEMO_CREDENTIALS[key].nik === rawInput
-    );
-
-    // Di Vercel atau jika menggunakan akun demo, langsung autentikasi tanpa mengirim request POST yang akan di-405 oleh Vercel
-    if (matchedDemoKey && (isVercel || data.password === 'password')) {
-      if (data.password === 'password') {
-        const demoUser = DEMO_CREDENTIALS[matchedDemoKey];
-        const token = 'demo_token_' + btoa(demoUser.email);
-        localStorage.setItem('wargalapor_token', token);
-        localStorage.setItem('wargalapor_user', JSON.stringify(demoUser));
-        return {
-          message: 'Berhasil masuk (Mode Cloud Demo)',
-          user: demoUser,
-          token,
-        };
-      } else {
-        throw new Error('Kata sandi salah. Untuk akun demo, gunakan kata sandi: password');
+      // Jika akun butuh aktivasi OTP (belum diverifikasi)
+      if ('requires_otp' in res.data && res.data.requires_otp) {
+        return res.data;
       }
-    }
 
-    // Jika di Vercel dan bukan akun demo, coba Supabase Auth langsung
-    if (isVercel) {
+      // Jika login berhasil & mendapatkan token resmi Sanctum
+      if ('token' in res.data && res.data.token) {
+        localStorage.setItem('wargalapor_token', res.data.token);
+        localStorage.setItem('wargalapor_user', JSON.stringify(res.data.user));
+      }
+
+      return res.data;
+    } catch (err: any) {
+      // Jika error 422 atau 401 dari backend Laravel yang aktif, lemparkan pesan validasi asli
+      if (err.response?.status === 422 || (err.response?.status === 401 && !err.isHtmlRewrite)) {
+        const msg =
+          err.response?.data?.message ||
+          err.response?.data?.errors?.email?.[0] ||
+          'Email atau kata sandi tidak valid.';
+        throw new Error(msg);
+      }
+
+      // 2. Jika backend offline, 404, atau 405 (Host Static Vercel yang tidak menjalankan PHP Laravel)
+      console.warn('Backend Laravel offline / 405 di Vercel, mengaktifkan Fallback Akun Demo & Supabase...');
+
+      // A. Kredensial Akun Demo Cepat (Ready to use di Vercel)
+      const DEMO_CREDENTIALS: Record<string, User> = {
+        'admin@wargalapor.test': {
+          id: 1,
+          name: 'Administrator Kota',
+          email: 'admin@wargalapor.test',
+          phone: '081122334455',
+          nik: '3171010000000001',
+          role: 'admin',
+          status: 'active',
+        },
+        'petugas@wargalapor.test': {
+          id: 2,
+          name: 'Budi Santoso (TRC)',
+          email: 'petugas@wargalapor.test',
+          phone: '081234567891',
+          nik: '3171010000000002',
+          role: 'officer',
+          status: 'active',
+          officer_profile: {
+            id: 1,
+            department: 'Dinas Bina Marga',
+            unit: 'Tim Reaksi Cepat',
+            area_coverage: 'Jakarta Pusat',
+            active_tasks_count: 3,
+            completed_tasks_count: 24,
+            status: 'available',
+          },
+        },
+        'petugas2@wargalapor.test': {
+          id: 4,
+          name: 'Siti Rahma (DLH)',
+          email: 'petugas2@wargalapor.test',
+          phone: '081234567892',
+          nik: '3171010000000004',
+          role: 'officer',
+          status: 'active',
+          officer_profile: {
+            id: 2,
+            department: 'Dinas Lingkungan Hidup',
+            unit: 'Satgas Kebersihan',
+            area_coverage: 'Jakarta Selatan',
+            active_tasks_count: 2,
+            completed_tasks_count: 18,
+            status: 'available',
+          },
+        },
+        'warga@wargalapor.test': {
+          id: 3,
+          name: 'Ahmad Syarif',
+          email: 'warga@wargalapor.test',
+          phone: '081234567890',
+          nik: '3171012345678901',
+          role: 'citizen',
+          status: 'active',
+        },
+      };
+
+      const matchedDemoKey = Object.keys(DEMO_CREDENTIALS).find(
+        (key) => key === cleanEmail || DEMO_CREDENTIALS[key].nik === rawInput
+      );
+
+      if (matchedDemoKey) {
+        if (data.password === 'password') {
+          const demoUser = DEMO_CREDENTIALS[matchedDemoKey];
+          const token = 'demo_token_' + btoa(demoUser.email);
+          localStorage.setItem('wargalapor_token', token);
+          localStorage.setItem('wargalapor_user', JSON.stringify(demoUser));
+          return {
+            message: 'Berhasil masuk (Mode Cloud Demo)',
+            user: demoUser,
+            token,
+          };
+        } else {
+          throw new Error('Kata sandi salah. Untuk akun demo, gunakan kata sandi: password');
+        }
+      }
+
+      // B. Coba login via Supabase Auth untuk akun umum
       try {
         const authRes = await supabase.auth.signInWithPassword({
           email: cleanEmail,
@@ -162,53 +187,6 @@ export const authService = {
         }
       } catch (sbErr) {
         console.warn('Supabase auth login skipped:', sbErr);
-      }
-
-      throw new Error(
-        'Gagal masuk di Vercel. Gunakan akun demo: admin@wargalapor.test (kata sandi: password).'
-      );
-    }
-
-    // 1. Coba login ke API Backend Laravel resmi (Localhost / Full-Stack / Cloudflare Tunnel)
-    try {
-      const res = await api.post<AuthResponse | (RegisterOtpResponse & { requires_otp: true })>(
-        '/auth/login',
-        data
-      );
-
-      // Jika akun butuh aktivasi OTP (belum diverifikasi)
-      if ('requires_otp' in res.data && res.data.requires_otp) {
-        return res.data;
-      }
-
-      // Jika login berhasil & mendapatkan token resmi Sanctum
-      if ('token' in res.data && res.data.token) {
-        localStorage.setItem('wargalapor_token', res.data.token);
-        localStorage.setItem('wargalapor_user', JSON.stringify(res.data.user));
-      }
-
-      return res.data;
-    } catch (err: any) {
-      // Jika error 422 atau 401 dari backend Laravel yang aktif, lemparkan pesan validasi asli
-      if (err.response?.status === 422 || (err.response?.status === 401 && !err.isHtmlRewrite)) {
-        const msg =
-          err.response?.data?.message ||
-          err.response?.data?.errors?.email?.[0] ||
-          'Email atau kata sandi tidak valid.';
-        throw new Error(msg);
-      }
-
-      // 2. Fallback Demo jika koneksi gagal
-      if (matchedDemoKey && data.password === 'password') {
-        const demoUser = DEMO_CREDENTIALS[matchedDemoKey];
-        const token = 'demo_token_' + btoa(demoUser.email);
-        localStorage.setItem('wargalapor_token', token);
-        localStorage.setItem('wargalapor_user', JSON.stringify(demoUser));
-        return {
-          message: 'Berhasil masuk (Mode Cloud Demo)',
-          user: demoUser,
-          token,
-        };
       }
 
       throw new Error(
@@ -378,7 +356,7 @@ export const authService = {
       if (saved) {
         try {
           return { user: JSON.parse(saved) };
-        } catch {}
+        } catch { }
       }
     }
     throw new Error('Sesi telah berakhir atau tidak valid.');

@@ -88,37 +88,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleQuickLogin = async (email: string, pass: string) => {
-    setIdentifier(email);
-    setPassword(pass);
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await login({
-        email,
-        password: pass,
-        security_token: 'quick_demo',
-        security_answer: 'demo',
-      });
-
-      const rawUser = localStorage.getItem('wargalapor_user');
-      const parsed = rawUser ? JSON.parse(rawUser) : null;
-      const userRole = parsed?.role || res?.user?.role;
-
-      if (userRole === 'admin') {
-        navigate('/admin');
-      } else if (userRole === 'officer') {
-        navigate('/officer');
-      } else {
-        navigate('/citizen');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Gagal masuk.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleOtpVerified = (verifiedUser: any) => {
     if (verifiedUser.role === 'admin') navigate('/admin');
     else if (verifiedUser.role === 'officer') navigate('/officer');
@@ -284,47 +253,6 @@ export const LoginPage: React.FC = () => {
                 >
                   Masuk ke Portal
                 </Button>
-
-                {/* 1-Click Demo Login Section */}
-                <div className="pt-2 border-t border-slate-100/90 mt-2">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      ⚡ 1-Click Login (Demo Vercel)
-                    </span>
-                    <span className="text-[10px] text-teal-700 font-semibold bg-teal-50 px-1.5 py-0.5 rounded">
-                      Instan
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => handleQuickLogin('admin@wargalapor.test', 'password')}
-                      className="py-1.5 px-2 rounded-lg bg-teal-50 hover:bg-teal-100 active:scale-95 border border-teal-200/80 text-teal-800 text-xs font-bold transition-all text-center flex items-center justify-center gap-1 cursor-pointer"
-                      title="Masuk sebagai Administrator Utama Kota"
-                    >
-                      <span>👑</span> Admin
-                    </button>
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => handleQuickLogin('petugas@wargalapor.test', 'password')}
-                      className="py-1.5 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 active:scale-95 border border-amber-200/80 text-amber-800 text-xs font-bold transition-all text-center flex items-center justify-center gap-1 cursor-pointer"
-                      title="Masuk sebagai Petugas Lapangan TRC"
-                    >
-                      <span>👷</span> Petugas
-                    </button>
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => handleQuickLogin('warga@wargalapor.test', 'password')}
-                      className="py-1.5 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 active:scale-95 border border-emerald-200/80 text-emerald-800 text-xs font-bold transition-all text-center flex items-center justify-center gap-1 cursor-pointer"
-                      title="Masuk sebagai Warga Pelapor"
-                    >
-                      <span>👤</span> Warga
-                    </button>
-                  </div>
-                </div>
               </form>
 
               {/* Bottom Register Redirect */}
