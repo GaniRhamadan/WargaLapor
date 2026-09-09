@@ -50,14 +50,15 @@ export const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value;
-    if (val.startsWith('+')) {
-      val = '+' + val.slice(1).replace(/\D/g, '');
-    } else {
-      val = val.replace(/\D/g, '');
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.startsWith('62')) {
+      val = val.slice(2);
     }
-    if (val.length <= 15) {
-      setPhone(val);
+    if (val.startsWith('0')) {
+      val = val.slice(1);
+    }
+    if (val.length <= 13) {
+      setPhone(val ? '+62' + val : '');
     }
   };
 
@@ -76,10 +77,9 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
-    // 2. Phone Length Check (10 to 15 digits)
-    const cleanPhone = phone.startsWith('+') ? phone.slice(1) : phone;
-    if (cleanPhone.length < 10 || phone.length > 15) {
-      setError('Nomor HP/WhatsApp harus antara 10 hingga 15 digit.');
+    // 2. Phone Length Check (enforce +62 Indonesian format with at least 8 digits)
+    if (!phone || phone.length < 11 || phone.length > 16) {
+      setError('Nomor HP/WhatsApp harus valid diawali +62 (minimal 9-13 digit angka, contoh: +62 812-3456-7890).');
       return;
     }
 
@@ -270,20 +270,24 @@ export const RegisterPage: React.FC = () => {
                       <label className="text-xs font-semibold text-slate-700 block">
                         No. WhatsApp/HP
                       </label>
-                      <span className="text-[10px] text-slate-400 font-mono">{phone.length}/15</span>
+                      <span className="text-[10px] text-teal-700 font-mono font-bold">
+                        {phone || '+62'}
+                      </span>
                     </div>
-                    <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-teal-600 group-focus-within:scale-110 transition-all duration-200">
-                        <Phone className="w-3.5 h-3.5" />
+                    <div className="relative group flex items-center">
+                      <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200">
+                          🇮🇩 +62
+                        </span>
                       </div>
                       <input
                         type="tel"
                         required
-                        maxLength={15}
-                        placeholder="0812xxxxxxxx"
-                        value={phone}
+                        maxLength={13}
+                        placeholder="81234567890"
+                        value={phone.replace(/^\+62/, '')}
                         onChange={handlePhoneChange}
-                        className="w-full text-xs pl-8 pr-2 py-2 rounded-xl border border-slate-200/90 bg-white/90 hover:bg-white focus:bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 focus:shadow-sm transition-all duration-200 font-mono"
+                        className="w-full text-xs pl-17 pr-2 py-2 rounded-xl border border-slate-200/90 bg-white/90 hover:bg-white focus:bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 focus:shadow-sm transition-all duration-200 font-mono"
                       />
                     </div>
                   </div>

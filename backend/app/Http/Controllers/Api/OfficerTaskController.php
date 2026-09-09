@@ -138,13 +138,29 @@ class OfficerTaskController extends Controller
         $newStatus = strtoupper($validated['status']);
         $oldStatus = $report->status;
         $resolutionProof = $validated['resolution_proof_image'] ?? $validated['proof_image'] ?? null;
+        $targetAssignment = $assignment ?? null;
 
-        return DB::transaction(function () use ($report, $user, $validated, $newStatus, $oldStatus, $resolutionProof) {
+        return DB::transaction(function () use ($report, $user, $validated, $newStatus, $oldStatus, $resolutionProof, $targetAssignment) {
             $report->status = $newStatus;
             if ($newStatus === 'RESOLVED') {
                 $report->resolved_at = now();
             }
             $report->save();
+
+            // Sync assignment record if available
+            $currentAssignment = $targetAssignment ?? $report->latestAssignment;
+            if ($currentAssignment) {
+                if ($newStatus === 'RESOLVED') {
+                    $currentAssignment->status = 'COMPLETED';
+                    $currentAssignment->completed_at = now();
+                } elseif ($newStatus === 'IN_PROGRESS') {
+                    $currentAssignment->status = 'IN_PROGRESS';
+                    if (!$currentAssignment->accepted_at) {
+                        $currentAssignment->accepted_at = now();
+                    }
+                }
+                $currentAssignment->save();
+            }
 
             if (!empty($validated['progress_images'])) {
                 foreach ($validated['progress_images'] as $pImg) {

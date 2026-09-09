@@ -71,11 +71,21 @@ class AuthController extends Controller
             'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
         ]);
 
+        // Normalize phone number to standard Indonesian +62 international format
+        $phone = trim($validated['phone']);
+        if (str_starts_with($phone, '0')) {
+            $phone = '+62' . substr($phone, 1);
+        } elseif (str_starts_with($phone, '62')) {
+            $phone = '+' . $phone;
+        } elseif (!str_starts_with($phone, '+')) {
+            $phone = '+62' . $phone;
+        }
+
         // 3. Create Pending User (Unverified until OTP is confirmed)
         $user = User::create([
             'name' => $validated['name'],
             'email' => strtolower($validated['email']),
-            'phone' => $validated['phone'],
+            'phone' => $phone,
             'nik' => $validated['nik'] ?? null,
             'role' => 'citizen',
             'status' => 'pending_verification',
