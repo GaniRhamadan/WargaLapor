@@ -10,6 +10,67 @@ interface AntiBotChallengeProps {
   compact?: boolean;
 }
 
+function generateClientCaptcha(): SecurityChallenge {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let code = '';
+  for (let i = 0; i < 5; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 50;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#141826';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < 4; i++) {
+      ctx.strokeStyle = `rgba(${Math.random() > 0.5 ? '20, 184, 166' : '99, 102, 241'}, ${0.3 + Math.random() * 0.4})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+      ctx.bezierCurveTo(
+        Math.random() * canvas.width, Math.random() * canvas.height,
+        Math.random() * canvas.width, Math.random() * canvas.height,
+        Math.random() * canvas.width, Math.random() * canvas.height
+      );
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 35; i++) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.1 + Math.random() * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const colors = ['#2dd4bf', '#38bdf8', '#fbbf24', '#34d399', '#f472b6', '#a78bfa'];
+    ctx.font = 'bold 24px monospace';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < code.length; i++) {
+      ctx.save();
+      const x = 18 + i * 26;
+      const y = 25 + (Math.random() * 6 - 3);
+      const angle = (Math.random() * 30 - 15) * (Math.PI / 180);
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.fillText(code[i], -8, 0);
+      ctx.restore();
+    }
+  }
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const token = 'local_' + btoa(code);
+  return {
+    token,
+    captcha_image: dataUrl,
+    question: 'Ketik 5 karakter kode anti-bot',
+    expires_in_seconds: 300,
+  };
+}
+
 export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
   onChallengeChange,
   honeypotValue,
@@ -27,10 +88,14 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
     setIsAnswered(false);
     try {
       const data = await authService.getSecurityChallenge();
+      if (!data || !data.captcha_image) throw new Error('Invalid captcha data');
       setChallenge(data);
       onChallengeChange({ token: data.token, answer: '', isValid: false });
     } catch {
-      // Fallback
+      // Fallback mandiri di frontend (Canvas CAPTCHA)
+      const fallback = generateClientCaptcha();
+      setChallenge(fallback);
+      onChallengeChange({ token: fallback.token, answer: '', isValid: false });
     } finally {
       setLoading(false);
     }
@@ -41,12 +106,21 @@ export const AntiBotChallenge: React.FC<AntiBotChallengeProps> = ({
   }, []);
 
   const handleAnswerChange = (val: string) => {
-    // Only allow alphanumeric characters, uppercase, max 5 chars
     const cleaned = val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
     setAnswer(cleaned);
-    const valid = cleaned.length >= 4 && challenge !== null;
-    setIsAnswered(valid);
+    let valid = false;
     if (challenge) {
+      if (challenge.token.startsWith('local_')) {
+        try {
+          const expected = atob(challenge.token.replace('local_', ''));
+          valid = cleaned === expected;
+        } catch {
+          valid = cleaned.length === 5;
+        }
+      } else {
+        valid = cleaned.length >= 4;
+      }
+      setIsAnswered(valid);
       onChallengeChange({
         token: challenge.token,
         answer: cleaned,
