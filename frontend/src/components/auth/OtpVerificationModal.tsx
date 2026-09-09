@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Mail, MessageSquare, ArrowRight, RefreshCw, AlertCircle, CheckCircle2, Lock } from 'lucide-react';
+import { ShieldCheck, Mail, RefreshCw, AlertCircle, Lock } from 'lucide-react';
 import { Button } from '../common/Button';
 import { authService } from '../../services/authService';
 
@@ -18,18 +18,24 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
   onVerified,
   onCancel,
 }) => {
-  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+  const [length, setLength] = useState<number>(8); // Default 8 sesuai token Supabase, fleksibel 6 atau 8
+  const [otp, setOtp] = useState<string[]>(Array(8).fill(''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(60);
   const [resendLoading, setResendLoading] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  const switchLength = (newLen: number) => {
+    setLength(newLen);
+    setOtp(Array(newLen).fill(''));
+    setError(null);
+    setTimeout(() => inputRefs.current[0]?.focus(), 50);
+  };
+
   useEffect(() => {
-    // Focus first input on mount
     inputRefs.current[0]?.focus();
 
-    // Cooldown countdown
     const timer = setInterval(() => {
       setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
@@ -38,23 +44,21 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
   }, []);
 
   const handleChange = (index: number, value: string) => {
-    // Only accept numeric digits
     if (!/^\d*$/.test(value)) return;
 
     const newOtp = [...otp];
-    // Take the last entered character if multiple
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
     setError(null);
 
-    // Auto-advance to next input
-    if (value && index < 5) {
+    // Auto-advance
+    if (value && index < length - 1) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto submit if all 6 digits filled
+    // Auto submit jika semua digit terisi
     const fullCode = newOtp.join('');
-    if (fullCode.length === 6 && !newOtp.includes('')) {
+    if (fullCode.length === length && !newOtp.includes('')) {
       handleVerify(fullCode);
     }
   };
@@ -67,19 +71,25 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').trim();
-    if (/^\d{6}$/.test(pastedData)) {
+    const pastedData = e.clipboardData.getData('text').trim().replace(/\D/g, '');
+    if (pastedData.length === 6 || pastedData.length === 8) {
+      setLength(pastedData.length);
       const digits = pastedData.split('');
       setOtp(digits);
-      inputRefs.current[5]?.focus();
       handleVerify(pastedData);
+    } else if (pastedData.length > 0) {
+      const targetLen = pastedData.length >= 8 ? 8 : 6;
+      setLength(targetLen);
+      const digits = pastedData.slice(0, targetLen).split('');
+      while (digits.length < targetLen) digits.push('');
+      setOtp(digits);
     }
   };
 
   const handleVerify = async (codeToVerify?: string) => {
-    const fullCode = codeToVerify || otp.join('');
-    if (fullCode.length !== 6) {
-      setError('Harap masukkan 6 digit kode OTP secara lengkap.');
+    const fullCode = (codeToVerify || otp.join('')).trim();
+    if (fullCode.length < 6) {
+      setError('Harap masukkan kode OTP secara lengkap.');
       return;
     }
 
@@ -95,8 +105,9 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
       onVerified(res.user);
     } catch (err: any) {
       setError(
+        err.message ||
         err.response?.data?.message ||
-        'Kode OTP tidak valid atau telah kedaluwarsa. Silakan periksa kembali.'
+        'Kode OTP tidak valid atau salah. Harap masukkan kode yang sesuai di email Anda.'
       );
     } finally {
       setLoading(false);
@@ -112,7 +123,7 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
       await authService.resendOtp(identifier, 'REGISTER');
       setResendCooldown(60);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Gagal mengirim ulang kode OTP. Silakan periksa koneksi.');
+      setError(err.message || 'Gagal mengirim ulang kode OTP. Silakan coba beberapa saat lagi.');
     } finally {
       setResendLoading(false);
     }
@@ -125,10 +136,10 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
           <Lock className="w-7 h-7" />
         </div>
         <h3 className="text-xl font-black text-slate-900 tracking-tight">
-          Verifikasi Kode OTP Akun Aktif
+          Verifikasi Kode OTP Akun Warga
         </h3>
         <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-          Masukkan 6 digit kode keamanan yang telah kami kirimkan ke{' '}
+          Masukkan kode keamanan yang telah kami kirimkan ke{' '}
           <strong className="text-slate-900 font-semibold">{identifier}</strong>
           {phone && (
             <span> / WhatsApp <strong className="text-slate-900 font-semibold">{phone}</strong></span>
@@ -136,23 +147,50 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
         </p>
       </div>
 
-      <div className="p-3.5 rounded-xl bg-teal-50/70 border border-teal-200/80 text-teal-900 text-xs flex items-center gap-2.5">
+      <div className="p-3 rounded-xl bg-teal-50/70 border border-teal-200/80 text-teal-900 text-xs flex items-center gap-2.5">
         <Mail className="w-4 h-4 text-teal-600 shrink-0" />
         <span className="leading-relaxed">
-          Kode OTP telah dikirimkan ke kotak masuk (inbox/spam) email Anda di <strong>{identifier}</strong>. Silakan periksa email Anda.
+          Kode OTP dikirim resmi dari <strong>parabu12siliwangi@gmail.com</strong> ke kotak masuk <strong>{identifier}</strong>.
         </span>
       </div>
 
       {error && (
         <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2 animate-shake">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span className="leading-tight">{error}</span>
+          <span className="leading-tight font-medium">{error}</span>
         </div>
       )}
 
-      {/* 6 Digit Inputs */}
+      {/* Pilihan Jumlah Digit (6 atau 8 Digit) */}
+      <div className="flex items-center justify-center gap-2 text-xs">
+        <span className="text-slate-500 text-[11px]">Format OTP di email:</span>
+        <button
+          type="button"
+          onClick={() => switchLength(8)}
+          className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
+            length === 8
+              ? 'bg-teal-600 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          8 Digit
+        </button>
+        <button
+          type="button"
+          onClick={() => switchLength(6)}
+          className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
+            length === 6
+              ? 'bg-teal-600 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          6 Digit
+        </button>
+      </div>
+
+      {/* Digit Inputs */}
       <div className="space-y-4">
-        <div className="flex justify-center items-center gap-2 sm:gap-3" onPaste={handlePaste}>
+        <div className="flex justify-center items-center gap-1.5 sm:gap-2" onPaste={handlePaste}>
           {otp.map((digit, idx) => (
             <input
               key={idx}
@@ -165,7 +203,7 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
               value={digit}
               onChange={(e) => handleChange(idx, e.target.value)}
               onKeyDown={(e) => handleKeyDown(idx, e)}
-              className={`w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-black rounded-xl border-2 transition-all outline-none ${
+              className={`w-9 h-12 sm:w-11 sm:h-13 text-center text-lg sm:text-xl font-black rounded-xl border-2 transition-all outline-none ${
                 digit
                   ? 'border-teal-600 bg-teal-50/40 text-teal-900 shadow-sm'
                   : 'border-slate-200 bg-white text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
@@ -179,7 +217,7 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
           variant="primary"
           size="md"
           isLoading={loading}
-          disabled={otp.join('').length !== 6}
+          disabled={otp.join('').length !== length}
           onClick={() => handleVerify()}
           className="w-full font-bold shadow-md shadow-teal-500/20 flex items-center justify-center gap-2"
         >

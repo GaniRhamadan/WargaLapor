@@ -185,57 +185,54 @@ export const authService = {
   },
 
   async verifyOtp(payload: VerifyOtpPayload): Promise<AuthResponse> {
-    // Real Supabase OTP Verification
+    const cleanToken = payload.otp_code.trim();
+
+    // 1. Validasi kode OTP secara ketat ke Supabase Auth
     const { data, error } = await supabase.auth.verifyOtp({
-      email: payload.identifier,
-      token: payload.otp_code,
+      email: payload.identifier.trim(),
+      token: cleanToken,
       type: 'signup',
     });
 
+    // Jika type signup gagal, coba type email
+    let verifiedData = data;
     if (error) {
-      // Fallback: periksa tabel public.users jika akun sudah terdaftar
-      const { data: userProfile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', payload.identifier)
-        .maybeSingle();
-
-      if (userProfile) {
-        const userObj: User = {
-          id: userProfile.id,
-          name: userProfile.name,
-          email: userProfile.email,
-          phone: userProfile.phone,
-          nik: userProfile.nik,
-          role: userProfile.role as UserRole,
-          status: 'active',
-        };
-        const token = 'sb_token_' + btoa(userProfile.email);
-        localStorage.setItem('wargalapor_token', token);
-        localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
-        return {
-          message: 'Akun berhasil diverifikasi!',
-          user: userObj,
-          token,
-        };
+      const retry = await supabase.auth.verifyOtp({
+        email: payload.identifier.trim(),
+        token: cleanToken,
+        type: 'email',
+      });
+      if (retry.error || !retry.data.user) {
+        // TOLAK TEGAS: Jangan biarkan masuk jika kode OTP salah / asal-asalan!
+        throw new Error('Kode OTP tidak valid atau salah. Harap masukkan kode yang sesuai di email Anda.');
       }
-      throw new Error(`Verifikasi gagal: ${error.message}`);
+      verifiedData = retry.data;
     }
 
-    const email = data.user?.email || payload.identifier;
-    const { data: userProfile } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+    if (!verifiedData.user) {
+      throw new Error('Kode OTP tidak valid atau telah kedaluwarsa.');
+    }
+
+    const email = verifiedData.user.email || payload.identifier.trim();
+
+    // 2. Aktifkan status user di database public.users
+    await supabase.from('users').update({ status: 'active' }).eq('email', email);
+
+    const { data: userProfile } = await supabase.from('users').select('*, officers(*)').eq('email', email).maybeSingle();
 
     const userObj: User = {
       id: userProfile?.id || Date.now(),
-      name: userProfile?.name || data.user?.user_metadata?.name || email.split('@')[0],
+      name: userProfile?.name || verifiedData.user.user_metadata?.name || email.split('@')[0],
       email: email,
-      phone: userProfile?.phone || null,
-      nik: userProfile?.nik || null,
+      phone: userProfile?.phone || verifiedData.user.user_metadata?.phone || null,
+      nik: userProfile?.nik || verifiedData.user.user_metadata?.nik || null,
       role: (userProfile?.role || 'citizen') as UserRole,
+      avatar: userProfile?.avatar || null,
       status: 'active',
+      officer_profile: userProfile?.officers?.[0] || null,
     };
 
-    const token = data.session?.access_token || 'sb_token_' + btoa(email);
+    const token = verifiedData.session?.access_token || 'sb_token_' + btoa(email);
     localStorage.setItem('wargalapor_token', token);
     localStorage.setItem('wargalapor_user', JSON.stringify(userObj));
 
